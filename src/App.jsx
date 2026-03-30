@@ -484,7 +484,7 @@ function UserManagement({ users, saveUsers, currentUser }) {
           </Fld>
           <div style={{display:"flex",gap:7,alignItems:"flex-end"}}>
             <button onClick={save} style={{flex:1,background:editId?COLORS.blue:COLORS.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>
-            {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}
+            {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:"#161E2A",color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}
           </div>
         </div>
       </div>
@@ -607,11 +607,11 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
         setSelectedIds(prev => { const n = new Set(prev); n.delete(confirmModal.row.id); return n; });
       } else if (confirmModal.row._status === "projected") {
         if (confirmModal.projMode === "occurrence") {
-          // skip just this one occurrence
           setSkippedOccs(prev => new Set([...prev, confirmModal.row.occId]));
         } else {
-          // delete the entire projection rule
-          setProjections(prev => prev.filter(p => p.id !== confirmModal.row.id));
+          // delete the entire projection rule using ruleId
+          const ruleId = confirmModal.row.ruleId || confirmModal.row.id;
+          setProjections(prev => prev.filter(p => p.id !== ruleId));
         }
       }
     } else if (confirmModal.mode === "bulk") {
@@ -644,14 +644,14 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
     (filterAccount==="all"||t.accountId===filterAccount)
   ),[actualTxns,filterEntity,filterAccount]);
 
-  // Expanded projected occurrences within forecast window — minus skipped ones
+  // Expanded projected occurrences — unlimited window (up to 2 years or dateTo filter)
   const filteredProjOccs = useMemo(()=>{
-    const endDate = dateStr(addDays(TODAY, forecastDays));
+    const endDate = dateTo || dateStr(addDays(TODAY, 730)); // 2 years if no date filter
     return projections
       .filter(p=>(filterEntity==="all"||p.entityId===filterEntity)&&(filterAccount==="all"||p.accountId===filterAccount))
       .flatMap(expandRecurring)
       .filter(occ=>occ.occDate > TODAY_STR && occ.occDate <= endDate && !skippedOccs.has(occ.occId));
-  },[projections,filterEntity,filterAccount,forecastDays,skippedOccs]);
+  },[projections,filterEntity,filterAccount,dateTo,skippedOccs]);
 
   // ── UNIFIED LEDGER ────────────────────────────────────────────────────────
   // Merge actual txns + projected occurrences into one chronological ledger
@@ -668,19 +668,21 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
 
     // Build projected rows — only future dates (> today)
     const projRows = filteredProjOccs.map(occ=>({
-      id: occ.occId,
-      date: occ.occDate,
+      id:          occ.occId,
+      occId:       occ.occId,        // needed for single-occurrence skip
+      ruleId:      occ.id,           // the original projection rule id
+      date:        occ.occDate,
       description: occ.description,
-      amount: occ.amount,
-      type: occ.type,
-      categoryId: occ.categoryId,
-      entityId: occ.entityId,
-      accountId: occ.accountId,
-      source: "projected",
-      recurrence: occ.recurrence,
-      _date: occ.occDate,
-      _status:"projected",
-      _sortKey: occ.occDate+"_P_"+occ.occId,
+      amount:      occ.amount,
+      type:        occ.type,
+      categoryId:  occ.categoryId,
+      entityId:    occ.entityId,
+      accountId:   occ.accountId,
+      source:      "projected",
+      recurrence:  occ.recurrence,
+      _date:       occ.occDate,
+      _status:     "projected",
+      _sortKey:    occ.occDate+"_P_"+occ.occId,
     }));
 
     // Combine, sort chronologically (actual before projected on same day)
@@ -810,7 +812,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
         ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:${COLORS.surface}}::-webkit-scrollbar-thumb{background:${COLORS.border};border-radius:3px}
         input,select{outline:none}input::placeholder{color:${COLORS.textDim}}
         @keyframes spin{to{transform:rotate(360deg)}}@keyframes fadein{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-        .rh:hover{background:${COLORS.surfaceHigh} !important}.rh-today:hover{background:#1E1800 !important}
+        .rh:hover{background:#161E2A !important}.rh-today:hover{background:#1E1800 !important}
         select option{background:${COLORS.surface};color:${COLORS.text}}
         .today-row{background:${COLORS.todayBg} !important}
       `}</style>
@@ -850,7 +852,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
               <div style={{fontSize:9,color:session?.user?.role==="admin"?COLORS.accent:COLORS.blue,textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:700}}>{session?.user?.role}</div>
             </div>
             <button onClick={onLogout} title="Sign out"
-              style={{background:COLORS.surfaceHigh,border:`1px solid ${COLORS.border}`,color:COLORS.textMid,borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:600,marginLeft:4,transition:"all 0.15s"}}
+              style={{background:"#161E2A",border:`1px solid ${COLORS.border}`,color:COLORS.textMid,borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:600,marginLeft:4,transition:"all 0.15s"}}
               onMouseEnter={e=>{e.currentTarget.style.borderColor=COLORS.danger+"55";e.currentTarget.style.color=COLORS.danger;}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor=COLORS.border;e.currentTarget.style.color=COLORS.textMid;}}>
               Sign out
@@ -946,7 +948,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
                     <span style={{fontSize:11,color:COLORS.danger}}>Removes from CashFlow Pro only. The transaction stays in QuickBooks.</span>
                   </div>
                   <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-                    <button onClick={cancelDelete} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+                    <button onClick={cancelDelete} style={{background:"#161E2A",color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
                     <button onClick={confirmDelete} style={{background:COLORS.danger,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Delete Transaction</button>
                   </div>
                 </>)}
@@ -981,7 +983,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
                     </div>
                   </div>
                   <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-                    <button onClick={cancelDelete} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+                    <button onClick={cancelDelete} style={{background:"#161E2A",color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
                     <button onClick={confirmDelete} disabled={!confirmModal.projMode}
                       style={{background:confirmModal.projMode==="rule"?COLORS.danger:COLORS.blue,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:confirmModal.projMode?"pointer":"not-allowed",opacity:confirmModal.projMode?1:0.4,transition:"all 0.15s"}}>
                       {!confirmModal.projMode?"Select an option":confirmModal.projMode==="occurrence"?"Remove This Date":confirmModal.row.recurrence==="once"?"Delete Projection":"Delete Entire Rule"}
@@ -1001,7 +1003,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
                     <span style={{fontSize:11,color:COLORS.danger}}>Removes from CashFlow Pro only. Transactions stay in QuickBooks.</span>
                   </div>
                   <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-                    <button onClick={cancelDelete} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+                    <button onClick={cancelDelete} style={{background:"#161E2A",color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
                     <button onClick={confirmDelete} style={{background:COLORS.danger,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Delete {selectedIds.size} Transactions</button>
                   </div>
                 </>)}
@@ -1020,7 +1022,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
               <span style={{fontSize:11,color:COLORS.textMid}}>To</span>
               <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}
                 style={{...inpS(),width:130,padding:"5px 9px"}}/>
-              {(dateFrom||dateTo)&&<button onClick={()=>{setDateFrom("");setDateTo("");}} style={{background:COLORS.surfaceHigh,border:`1px solid ${COLORS.border}`,color:COLORS.textMid,borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer"}}>✕ Clear</button>}
+              {(dateFrom||dateTo)&&<button onClick={()=>{setDateFrom("");setDateTo("");}} style={{background:"#161E2A",border:`1px solid ${COLORS.border}`,color:COLORS.textMid,borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer"}}>✕ Clear</button>}
               <div style={{width:1,background:COLORS.border,margin:"0 4px",height:20}}/>
               {["all","actual","projected"].map(f=>(
                 <button key={f} onClick={()=>{setTxnStatusFilter(f);clearSelection();}} style={{background:txnStatusFilter===f?(f==="actual"?COLORS.accentDim:f==="projected"?COLORS.blueDim:COLORS.surfaceHigh):"transparent",color:txnStatusFilter===f?(f==="actual"?COLORS.accent:f==="projected"?COLORS.blue:COLORS.text):COLORS.textMid,border:`1px solid ${txnStatusFilter===f?(f==="actual"?COLORS.accent+"44":f==="projected"?COLORS.blue+"44":COLORS.border):COLORS.border}`,borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"capitalize"}}>{f==="all"?"All":f==="actual"?"Actual (QB)":"Projected"}</button>
@@ -1043,7 +1045,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
                 )}
               </span>
               <div style={{marginLeft:"auto",display:"flex",gap:8}}>
-                <button onClick={clearSelection} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"6px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>Deselect all</button>
+                <button onClick={clearSelection} style={{background:"#161E2A",color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"6px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>Deselect all</button>
                 <button onClick={askDeleteBulk} style={{background:COLORS.danger,color:"#fff",border:"none",borderRadius:7,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
                   🗑 Delete {selectedIds.size} selected
                 </button>
@@ -1107,7 +1109,13 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
 
           {/* Monthly by Category Report */}
           {chartSubTab==="monthly"&&(
-            <MonthlyCategoryReport actualTxns={filteredActuals} categories={categories} entities={entities} filterEntity={filterEntity}/>
+            <MonthlyCategoryReport
+              actualTxns={filteredActuals}
+              projections={projections.filter(p=>(filterEntity==="all"||p.entityId===filterEntity)&&(filterAccount==="all"||p.accountId===filterAccount))}
+              categories={categories}
+              entities={entities}
+              openingBalance={openingBalance}
+            />
           )}
 
           {/* Line chart section */}
@@ -1218,157 +1226,221 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // MONTHLY CASHFLOW BY CATEGORY REPORT
 // ─────────────────────────────────────────────────────────────────────────────
-function MonthlyCategoryReport({ actualTxns, categories, entities, filterEntity }) {
-  const [reportType, setReportType] = useState("both"); // "income"|"expense"|"both"
-  const [months,     setMonths]     = useState(6);
+function MonthlyCategoryReport({ actualTxns, projections, categories, openingBalance }) {
+  const [reportType, setReportType] = useState("both");
+  const [reportFrom, setReportFrom] = useState(dateStr(addMonths(TODAY, -5)).slice(0,7));
+  const [reportTo,   setReportTo]   = useState(dateStr(addMonths(TODAY,  6)).slice(0,7));
 
-  // Build list of last N months
+  // Build month list between reportFrom and reportTo
   const monthList = useMemo(() => {
     const list = [];
-    for (let i = months - 1; i >= 0; i--) {
-      const d = addMonths(TODAY, -i);
-      list.push({ key: dateStr(d).slice(0, 7), label: d.toLocaleString("en-CA", { month: "short", year: "numeric" }) });
+    let cur = parseD(reportFrom + "-01");
+    const end = parseD(reportTo + "-01");
+    let safety = 0;
+    while (cur <= end && safety++ < 60) {
+      list.push({
+        key:   dateStr(cur).slice(0,7),
+        label: cur.toLocaleString("en-CA", { month:"short", year:"numeric" }),
+        isPast: dateStr(cur).slice(0,7) <= TODAY_STR.slice(0,7),
+      });
+      cur = addMonths(cur, 1);
     }
     return list;
-  }, [months]);
+  }, [reportFrom, reportTo]);
 
-  // Aggregate txns by category × month
+  // Expand projected occurrences for the report window
+  const projOccs = useMemo(() => {
+    const end = reportTo + "-31";
+    return (projections||[]).flatMap(p => expandRecurring(p).filter(o => o.occDate >= reportFrom+"-01" && o.occDate <= end));
+  }, [projections, reportFrom, reportTo]);
+
+  // Merge actual + projected into one set keyed by category × month
   const data = useMemo(() => {
     const monthKeys = new Set(monthList.map(m => m.key));
-    const map = {}; // catId → { monthKey → total }
+    const map = {};
+    // Actual
     actualTxns.forEach(t => {
-      const mk = t.date.slice(0, 7);
+      const mk = t.date.slice(0,7);
       if (!monthKeys.has(mk)) return;
       if (reportType !== "both" && t.type !== reportType) return;
       if (!map[t.categoryId]) map[t.categoryId] = {};
-      map[t.categoryId][mk] = (map[t.categoryId][mk] || 0) + (t.type === "income" ? t.amount : -t.amount);
+      map[t.categoryId][mk] = (map[t.categoryId][mk]||0) + (t.type==="income" ? t.amount : -t.amount);
     });
-
-    // Row totals
+    // Projected
+    projOccs.forEach(o => {
+      const mk = o.occDate.slice(0,7);
+      if (!monthKeys.has(mk)) return;
+      if (reportType !== "both" && o.type !== reportType) return;
+      if (!map[o.categoryId]) map[o.categoryId] = {};
+      map[o.categoryId][mk] = (map[o.categoryId][mk]||0) + (o.type==="income" ? o.amount : -o.amount);
+    });
     return Object.entries(map)
       .map(([catId, monthly]) => {
         const cat = categories.find(c => c.id === catId);
-        const total = Object.values(monthly).reduce((s, v) => s + v, 0);
+        const total = Object.values(monthly).reduce((s,v)=>s+v, 0);
         return { cat, monthly, total };
       })
       .filter(r => r.cat)
-      .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
-  }, [actualTxns, categories, monthList, reportType]);
+      .sort((a,b) => Math.abs(b.total) - Math.abs(a.total));
+  }, [actualTxns, projOccs, categories, monthList, reportType]);
 
-  // Monthly net totals (bottom row)
-  const monthlyNet = useMemo(() => {
-    const net = {};
-    data.forEach(row => {
-      monthList.forEach(m => {
-        net[m.key] = (net[m.key] || 0) + (row.monthly[m.key] || 0);
-      });
+  // Monthly net + running balance
+  const { monthlyNet, monthlyOpenBal, monthlyCloseBal } = useMemo(() => {
+    const net = {}, openBal = {}, closeBal = {};
+    let runBal = openingBalance || 0;
+    // Pre-compute net for months before reportFrom to get opening balance right
+    actualTxns.forEach(t => {
+      if (t.date.slice(0,7) < reportFrom) {
+        runBal += t.type==="income" ? t.amount : -t.amount;
+      }
     });
-    return net;
-  }, [data, monthList]);
+    monthList.forEach(m => {
+      openBal[m.key] = runBal;
+      const monthActual = actualTxns.filter(t=>t.date.slice(0,7)===m.key);
+      const monthProj   = projOccs.filter(o=>o.occDate.slice(0,7)===m.key);
+      let monthNet = 0;
+      monthActual.forEach(t => { monthNet += t.type==="income" ? t.amount : -t.amount; });
+      monthProj.forEach(o   => { monthNet += o.type==="income" ? o.amount : -o.amount; });
+      net[m.key] = monthNet;
+      runBal += monthNet;
+      closeBal[m.key] = runBal;
+    });
+    return { monthlyNet: net, monthlyOpenBal: openBal, monthlyCloseBal: closeBal };
+  }, [data, monthList, actualTxns, projOccs, openingBalance, reportFrom]);
 
-  const maxAbs = Math.max(...data.flatMap(r => monthList.map(m => Math.abs(r.monthly[m.key] || 0))), 1);
+  const maxAbs = Math.max(...data.flatMap(r => monthList.map(m => Math.abs(r.monthly[m.key]||0))), 1);
+  const GCOLS = `180px repeat(${monthList.length}, 1fr) 110px`;
+
+  const Cell = ({val, bold, dim}) => {
+    const color = val===0 ? "#344558" : val>0 ? "#00C896" : "#FF4D4D";
+    return <div style={{padding:"8px 6px",textAlign:"right"}}>
+      <span style={{fontSize:11,fontFamily:"monospace",fontWeight:bold?800:600,color:dim?"#6B8299":color}}>
+        {val===0?"—":(val>0?"+":"")+fmtShort(val)}
+      </span>
+    </div>;
+  };
 
   return (
-    <div style={{ animation: "fadein 0.25s ease" }}>
+    <div style={{animation:"fadein 0.25s ease"}}>
       {/* Controls */}
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 11, color: COLORS.textMid }}>Show:</span>
-        {[{ k: "both", l: "Income & Expense" }, { k: "income", l: "Income only" }, { k: "expense", l: "Expense only" }].map(({ k, l }) => (
-          <button key={k} onClick={() => setReportType(k)} style={{ background: reportType === k ? COLORS.accentDim : "transparent", color: reportType === k ? COLORS.accent : COLORS.textMid, border: `1px solid ${reportType === k ? COLORS.accent + "44" : COLORS.border}`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{l}</button>
+      <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
+        <span style={{fontSize:11,color:COLORS.textMid}}>From</span>
+        <input type="month" value={reportFrom} onChange={e=>setReportFrom(e.target.value)}
+          style={{...inpS(),width:140,padding:"5px 9px"}}/>
+        <span style={{fontSize:11,color:COLORS.textMid}}>To</span>
+        <input type="month" value={reportTo} onChange={e=>setReportTo(e.target.value)}
+          style={{...inpS(),width:140,padding:"5px 9px"}}/>
+        <div style={{width:1,background:COLORS.border,height:18}}/>
+        {[{k:"both",l:"Income & Expense"},{k:"income",l:"Income"},{k:"expense",l:"Expense"}].map(({k,l})=>(
+          <button key={k} onClick={()=>setReportType(k)} style={{background:reportType===k?COLORS.accentDim:"transparent",color:reportType===k?COLORS.accent:COLORS.textMid,border:`1px solid ${reportType===k?COLORS.accent+"44":COLORS.border}`,borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>
         ))}
-        <div style={{ width: 1, background: COLORS.border, height: 18 }} />
-        <span style={{ fontSize: 11, color: COLORS.textMid }}>Months:</span>
-        {[3, 6, 12].map(m => (
-          <button key={m} onClick={() => setMonths(m)} style={{ background: months === m ? COLORS.blueDim : "transparent", color: months === m ? COLORS.blue : COLORS.textMid, border: `1px solid ${months === m ? COLORS.blue + "44" : COLORS.border}`, borderRadius: 6, padding: "5px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{m}mo</button>
-        ))}
+        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8,fontSize:11,color:COLORS.textMid}}>
+          <div style={{width:10,height:10,borderRadius:2,background:COLORS.accent+"55",border:`1px solid ${COLORS.accent}66`}}/>Actual
+          <div style={{width:10,height:10,borderRadius:2,background:COLORS.blue+"55",border:`1px dashed ${COLORS.blue}88`}}/>Projected
+        </div>
       </div>
 
       {/* Table */}
-      <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "auto" }}>
-        {/* Header row */}
-        <div style={{ display: "grid", gridTemplateColumns: `180px repeat(${monthList.length}, 1fr) 110px`, gap: 0, background: "#161E2A", borderBottom: `1px solid ${COLORS.border}`, minWidth: 500 }}>
-          <div style={{ padding: "8px 14px", fontSize: 10, color: "#7A96B0", textTransform: "uppercase", letterSpacing: "0.09em", fontWeight: 600 }}>Category</div>
-          {monthList.map(m => (
-            <div key={m.key} style={{ padding: "8px 8px", fontSize: 10, color: "#7A96B0", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, textAlign: "right" }}>{m.label}</div>
+      <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,overflow:"auto"}}>
+        {/* Header */}
+        <div style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,background:"#161E2A",borderBottom:`1px solid ${COLORS.border}`,minWidth:600}}>
+          <div style={{padding:"8px 14px",fontSize:10,color:"#7A96B0",textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:600}}>Category</div>
+          {monthList.map(m=>(
+            <div key={m.key} style={{padding:"8px 6px",textAlign:"right"}}>
+              <div style={{fontSize:10,color:"#7A96B0",fontWeight:600,letterSpacing:"0.06em"}}>{m.label}</div>
+              <div style={{fontSize:8,color:m.isPast?COLORS.accent:COLORS.blue,fontWeight:700,textTransform:"uppercase",marginTop:1}}>{m.isPast?"Actual":"Forecast"}</div>
+            </div>
           ))}
-          <div style={{ padding: "8px 14px", fontSize: 10, color: "#7A96B0", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, textAlign: "right" }}>Total</div>
+          <div style={{padding:"8px 14px",fontSize:10,color:"#7A96B0",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600,textAlign:"right"}}>Total</div>
         </div>
 
-        {data.length === 0 && <Empty msg="No transaction data for the selected period." />}
-
-        {data.map(({ cat, monthly, total }) => (
-          <div key={cat.id} className="rh" style={{ display: "grid", gridTemplateColumns: `180px repeat(${monthList.length}, 1fr) 110px`, gap: 0, borderBottom: `1px solid ${COLORS.border}`, minWidth: 500, transition: "background 0.12s" }}>
-            {/* Category name */}
-            <div style={{ padding: "9px 14px", display: "flex", alignItems: "center", gap: 7 }}>
-              <Dot color={cat.color} size={7} />
-              <span style={{ fontSize: 12, color: COLORS.text, fontWeight: 500 }}>{cat.name}</span>
-              <span style={{ fontSize: 9, color: cat.type === "income" ? COLORS.accent : COLORS.danger, textTransform: "uppercase", fontWeight: 700 }}>{cat.type === "income" ? "▲" : "▼"}</span>
+        {/* Opening balance row */}
+        <div style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,borderBottom:`1px solid ${COLORS.border}`,background:"#0E1828",minWidth:600}}>
+          <div style={{padding:"7px 14px",fontSize:11,color:COLORS.textMid,fontWeight:700,fontStyle:"italic"}}>Opening Balance</div>
+          {monthList.map(m=>(
+            <div key={m.key} style={{padding:"7px 6px",textAlign:"right"}}>
+              <span style={{fontSize:11,fontFamily:"monospace",fontWeight:700,color:balColor(monthlyOpenBal[m.key]||0,0)}}>{fmtShort(monthlyOpenBal[m.key]||0)}</span>
             </div>
-            {/* Monthly cells with bar */}
-            {monthList.map(m => {
-              const val = monthly[m.key] || 0;
-              const barW = val !== 0 ? Math.max(3, Math.round((Math.abs(val) / maxAbs) * 60)) : 0;
-              const isPos = val >= 0;
+          ))}
+          <div style={{padding:"7px 14px"}}/>
+        </div>
+
+        {data.length===0&&<Empty msg="No data for selected period."/>}
+
+        {/* Category rows */}
+        {data.map(({cat,monthly,total})=>(
+          <div key={cat.id} className="rh" style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,borderBottom:`1px solid ${COLORS.border}`,minWidth:600,transition:"background 0.12s"}}>
+            <div style={{padding:"9px 14px",display:"flex",alignItems:"center",gap:7}}>
+              <Dot color={cat.color} size={7}/>
+              <span style={{fontSize:12,color:COLORS.text,fontWeight:500}}>{cat.name}</span>
+              <span style={{fontSize:9,color:cat.type==="income"?COLORS.accent:COLORS.danger,fontWeight:700}}>{cat.type==="income"?"▲":"▼"}</span>
+            </div>
+            {monthList.map(m=>{
+              const val = monthly[m.key]||0;
+              const barW = val!==0?Math.max(3,Math.round((Math.abs(val)/maxAbs)*60)):0;
+              const isPos=val>=0;
+              // Check if this cell has projected data
+              const hasProj = projOccs.some(o=>o.occDate.slice(0,7)===m.key&&o.categoryId===cat.id);
               return (
-                <div key={m.key} style={{ padding: "9px 8px", textAlign: "right", position: "relative" }}>
-                  {barW > 0 && (
-                    <div style={{ position: "absolute", bottom: 4, right: 8, height: 3, width: barW, background: isPos ? COLORS.accent + "55" : COLORS.danger + "55", borderRadius: 2 }} />
-                  )}
-                  <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color: val === 0 ? COLORS.textDim : isPos ? COLORS.accent : COLORS.danger }}>
-                    {val === 0 ? "—" : (isPos ? "+" : "") + fmtShort(val)}
+                <div key={m.key} style={{padding:"9px 6px",textAlign:"right",position:"relative",borderLeft:hasProj?`2px dashed ${COLORS.blue}33`:"none"}}>
+                  {barW>0&&<div style={{position:"absolute",bottom:4,right:6,height:3,width:barW,background:isPos?COLORS.accent+"55":COLORS.danger+"55",borderRadius:2}}/>}
+                  <span style={{fontSize:11,fontFamily:"monospace",fontWeight:600,color:val===0?"#344558":isPos?COLORS.accent:COLORS.danger}}>
+                    {val===0?"—":(isPos?"+":"")+fmtShort(val)}
                   </span>
                 </div>
               );
             })}
-            {/* Row total */}
-            <div style={{ padding: "9px 14px", textAlign: "right" }}>
-              <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 800, color: total >= 0 ? COLORS.accent : COLORS.danger }}>
-                {total >= 0 ? "+" : ""}{fmtShort(total)}
+            <div style={{padding:"9px 14px",textAlign:"right"}}>
+              <span style={{fontSize:11,fontFamily:"monospace",fontWeight:800,color:total>=0?COLORS.accent:COLORS.danger}}>
+                {total>=0?"+":""}{fmtShort(total)}
               </span>
             </div>
           </div>
         ))}
 
-        {/* Net row */}
-        {data.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: `180px repeat(${monthList.length}, 1fr) 110px`, gap: 0, borderTop: `2px solid ${COLORS.border}`, background: COLORS.surfaceHigh, minWidth: 500 }}>
-            <div style={{ padding: "10px 14px", fontSize: 12, fontWeight: 800, color: COLORS.text }}>Net Cash Flow</div>
-            {monthList.map(m => {
-              const val = monthlyNet[m.key] || 0;
-              return (
-                <div key={m.key} style={{ padding: "10px 8px", textAlign: "right" }}>
-                  <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 800, color: balColor(val, 0) }}>
-                    {val >= 0 ? "+" : ""}{fmtShort(val)}
-                  </span>
-                </div>
-              );
+        {/* Net cash flow row */}
+        {data.length>0&&(
+          <div style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,borderTop:`1px solid ${COLORS.borderMid}`,background:"#0E1828",minWidth:600}}>
+            <div style={{padding:"9px 14px",fontSize:12,fontWeight:800,color:COLORS.text}}>Net Cash Flow</div>
+            {monthList.map(m=>{
+              const val=monthlyNet[m.key]||0;
+              return <Cell key={m.key} val={val} bold/>;
             })}
-            <div style={{ padding: "10px 14px", textAlign: "right" }}>
-              <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 800, color: balColor(Object.values(monthlyNet).reduce((s, v) => s + v, 0), 0) }}>
-                {fmtShort(Object.values(monthlyNet).reduce((s, v) => s + v, 0))}
-              </span>
-            </div>
+            <Cell val={Object.values(monthlyNet).reduce((s,v)=>s+v,0)} bold/>
+          </div>
+        )}
+
+        {/* Closing balance row */}
+        {data.length>0&&(
+          <div style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,borderTop:`2px solid ${COLORS.border}`,background:"#0E1828",minWidth:600}}>
+            <div style={{padding:"9px 14px",fontSize:12,fontWeight:800,color:COLORS.text,fontStyle:"italic"}}>Closing Balance</div>
+            {monthList.map(m=>(
+              <div key={m.key} style={{padding:"9px 6px",textAlign:"right"}}>
+                <span style={{fontSize:12,fontFamily:"monospace",fontWeight:800,color:balColor(monthlyCloseBal[m.key]||0,0)}}>{fmtShort(monthlyCloseBal[m.key]||0)}</span>
+              </div>
+            ))}
+            <div style={{padding:"9px 14px"}}/>
           </div>
         )}
       </div>
 
-      {/* Mini bar chart — monthly net */}
-      {data.length > 0 && (
-        <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "16px 20px", marginTop: 16 }}>
-          <div style={{ fontSize: 11, color: COLORS.textMid, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 14 }}>Monthly Net Cash Flow</div>
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", height: 80 }}>
-            {monthList.map(m => {
-              const val = monthlyNet[m.key] || 0;
-              const maxNet = Math.max(...monthList.map(mm => Math.abs(monthlyNet[mm.key] || 0)), 1);
-              const h = Math.max(4, Math.round((Math.abs(val) / maxNet) * 64));
-              const isPos = val >= 0;
+      {/* Bar chart */}
+      {data.length>0&&(
+        <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,padding:"16px 20px",marginTop:16}}>
+          <div style={{fontSize:11,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.09em",marginBottom:14}}>Monthly Net + Closing Balance</div>
+          <div style={{display:"flex",gap:6,alignItems:"flex-end",height:90}}>
+            {monthList.map(m=>{
+              const net  = monthlyNet[m.key]||0;
+              const close= monthlyCloseBal[m.key]||0;
+              const maxNet = Math.max(...monthList.map(mm=>Math.abs(monthlyNet[mm.key]||0)),1);
+              const h = Math.max(4,Math.round((Math.abs(net)/maxNet)*70));
+              const isPos = net>=0;
               return (
-                <div key={m.key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                  <div style={{ fontSize: 9, color: isPos ? COLORS.accent : COLORS.danger, fontWeight: 700, fontFamily: "monospace" }}>
-                    {val === 0 ? "" : (isPos ? "+" : "") + fmtShort(val).replace("CA", "").replace(",000", "k")}
-                  </div>
-                  <div style={{ width: "100%", maxWidth: 40, height: h, background: isPos ? COLORS.accent + "88" : COLORS.danger + "88", borderRadius: "4px 4px 0 0", border: `1px solid ${isPos ? COLORS.accent + "66" : COLORS.danger + "66"}` }} />
-                  <div style={{ fontSize: 9, color: COLORS.textMid, textAlign: "center" }}>{m.label.split(" ")[0]}</div>
+                <div key={m.key} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                  <div style={{fontSize:8,color:balColor(close,0),fontWeight:700,fontFamily:"monospace"}}>{fmtShort(close).replace("CA","").replace(",000","k")}</div>
+                  <div style={{fontSize:8,color:isPos?COLORS.accent:COLORS.danger,fontFamily:"monospace"}}>{net===0?"":((isPos?"+":"")+fmtShort(net).replace("CA","").replace(",000","k"))}</div>
+                  <div style={{width:"100%",maxWidth:36,height:h,background:isPos?COLORS.accent+"88":COLORS.danger+"88",borderRadius:"3px 3px 0 0",border:`1px solid ${isPos?COLORS.accent+"66":COLORS.danger+"66"}`,borderStyle:m.isPast?"solid":"dashed"}}/>
+                  <div style={{fontSize:8,color:COLORS.textMid,textAlign:"center"}}>{m.label.split(" ")[0]}</div>
                 </div>
               );
             })}
@@ -1423,7 +1495,7 @@ function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore
       )}
 
       {/* Column headers — with select-all checkbox */}
-      <div style={{display:"grid",gridTemplateColumns:COLS,gap:10,padding:"8px 14px",borderBottom:`1px solid ${COLORS.border}`,background:COLORS.surfaceHigh}}>
+      <div style={{display:"grid",gridTemplateColumns:COLS,gap:10,padding:"8px 14px",borderBottom:`1px solid ${COLORS.border}`,background:"#161E2A"}}>
         {canDelete&&(
           <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}>
             <input type="checkbox" checked={allSelected} ref={el=>{if(el)el.indeterminate=someSelected&&!allSelected;}}
@@ -1431,7 +1503,7 @@ function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore
               style={{width:14,height:14,cursor:"pointer",accentColor:COLORS.accent}}/>
           </div>
         )}
-        {LABELS.map(l=><span key={l} style={{fontSize:10,color:COLORS.textDim,textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:700}}>{l}</span>)}
+        {LABELS.map(l=><span key={l} style={{fontSize:10,color:"#7A96B0",textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:600}}>{l}</span>)}
       </div>
 
       <div style={{maxHeight:showAll?620:380,overflowY:"auto"}}>
@@ -1578,7 +1650,7 @@ function ProjectionsTab({projections,setProjections,filteredProjOccs,entities,ac
         {form.recurrence!=="once"&&<Fld label="End Date"><input style={inpS()} type="date" value={form.endDate} onChange={e=>setForm(f=>({...f,endDate:e.target.value}))}/></Fld>}
         <div style={{gridColumn:form.recurrence==="once"?"2/4":"3/5",display:"flex",gap:8,alignItems:"flex-end"}}>
           <button onClick={save} style={{flex:1,background:editId?COLORS.blue:COLORS.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:13,cursor:"pointer"}}>{editId?"Save Changes":"Add Rule"}</button>
-          {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"9px 12px",fontSize:12,cursor:"pointer"}}>Cancel</button>}
+          {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:"#161E2A",color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"9px 12px",fontSize:12,cursor:"pointer"}}>Cancel</button>}
         </div>
       </div>
     </div>
@@ -1646,7 +1718,7 @@ function EntitiesSettings({entities,setEntities}){
         <Fld label="Company Name"><input style={inpS()} placeholder="Canada MedLaser Inc" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
         <Fld label="Short Code"><input style={inpS()} placeholder="CML" value={form.short} onChange={e=>setForm(f=>({...f,short:e.target.value.toUpperCase().slice(0,6)}))}/></Fld>
         <Fld label="Colour"><div style={{display:"flex",gap:5,flexWrap:"wrap",paddingTop:2}}>{PALETTE.map(p=><div key={p} onClick={()=>setForm(f=>({...f,color:p}))} style={{width:22,height:22,borderRadius:"50%",background:p,cursor:"pointer",border:form.color===p?`3px solid ${COLORS.text}`:`2px solid ${COLORS.bg}`}}/>)}</div></Fld>
-        <div style={{display:"flex",gap:6,alignItems:"flex-end"}}><button onClick={save} style={{flex:1,background:editId?COLORS.blue:COLORS.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>{editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}</div>
+        <div style={{display:"flex",gap:6,alignItems:"flex-end"}}><button onClick={save} style={{flex:1,background:editId?COLORS.blue:COLORS.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>{editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:"#161E2A",color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}</div>
       </div>
     </div>
     <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,overflow:"hidden"}}>
@@ -1686,7 +1758,7 @@ function AccountsSettings({accounts,setAccounts,entities}){
         </Fld>
         <div style={{display:"flex",gap:6,alignItems:"flex-end"}}>
           <button onClick={save} style={{flex:1,background:editId?COLORS.blue:COLORS.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>
-          {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}
+          {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:"#161E2A",color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}
         </div>
       </div>
       {/* Overdraft explanation */}
@@ -1702,7 +1774,7 @@ function AccountsSettings({accounts,setAccounts,entities}){
         if(!eAccs.length) return null;
         return(
           <div key={ent.id}>
-            <div style={{padding:"7px 14px",background:COLORS.surfaceHigh,borderBottom:`1px solid ${COLORS.border}`,display:"flex",alignItems:"center",gap:7}}>
+            <div style={{padding:"7px 14px",background:"#161E2A",borderBottom:`1px solid ${COLORS.border}`,display:"flex",alignItems:"center",gap:7}}>
               <Dot color={ent.color} size={8}/>
               <span style={{fontSize:11,color:ent.color,fontWeight:700}}>{ent.name}</span>
               <span style={{fontSize:10,color:COLORS.textDim,marginLeft:"auto"}}>Total: {fmtShort(eAccs.reduce((s,a)=>s+(a.openBalance||0),0))}</span>
@@ -1731,7 +1803,7 @@ function AccountsSettings({accounts,setAccounts,entities}){
       {accounts.length===0&&<Empty msg="No accounts."/>}
     </div>
     {/* Column header for accounts table */}
-    <style>{`.acc-hdr{display:grid;grid-template-columns:100px 1fr 120px 130px 120px 100px;gap:10px;padding:8px 14px;background:${COLORS.surfaceHigh};border-bottom:1px solid ${COLORS.border}}`}</style>
+    <style>{`.acc-hdr{display:grid;grid-template-columns:100px 1fr 120px 130px 120px 100px;gap:10px;padding:8px 14px;background:#161E2A;border-bottom:1px solid ${COLORS.border}}`}</style>
   </div>);
 }
 
@@ -1748,7 +1820,7 @@ function CategoriesSettings({categories,setCategories}){
         <Fld label="Name"><input style={inpS()} placeholder="Franchise Fees" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
         <Fld label="Type"><select style={selS()} value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}><option value="income">Income</option><option value="expense">Expense</option></select></Fld>
         <Fld label="Colour"><div style={{display:"flex",gap:5,flexWrap:"wrap",paddingTop:2}}>{PALETTE.map(p=><div key={p} onClick={()=>setForm(f=>({...f,color:p}))} style={{width:20,height:20,borderRadius:"50%",background:p,cursor:"pointer",border:form.color===p?`3px solid ${COLORS.text}`:`2px solid ${COLORS.bg}`}}/>)}</div></Fld>
-        <div style={{display:"flex",gap:6,alignItems:"flex-end"}}><button onClick={save} style={{flex:1,background:editId?COLORS.blue:COLORS.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>{editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}</div>
+        <div style={{display:"flex",gap:6,alignItems:"flex-end"}}><button onClick={save} style={{flex:1,background:editId?COLORS.blue:COLORS.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>{editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:"#161E2A",color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}</div>
       </div>
     </div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
