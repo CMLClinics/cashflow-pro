@@ -11,7 +11,7 @@ const hashPw = async (pw) => {
 
 // Roles: "admin" = full access | "viewer" = read-only, no delete/settings
 const DEFAULT_USERS = [
-  { id:"u1", name:"Oleg", email:"oleg@canadamedlaser.ca", role:"admin", hash:"" },
+  { id:"u1", name:"Oleg", email:"olegc@canadamedlaser.ca", role:"admin", hash:"" },
 ];
 // Pre-set default passwords (SHA-256 of "Admin2026!" and "View2026!")
 // admin hash for "Admin2026!" — generated at build time
@@ -181,11 +181,21 @@ export default function AuthGate() {
     try {
       const storedUsers = localStorage.getItem(USERS_KEY);
       const parsedUsers = storedUsers ? JSON.parse(storedUsers) : null;
+      // Auto-clear stale cache: if stored users don't include any of the default emails, wipe and reset
+      const defaultEmails = DEFAULT_USERS.map(u=>u.email.toLowerCase());
+      const storedEmails  = (parsedUsers||[]).map(u=>u.email?.toLowerCase());
+      const hasValidUser  = defaultEmails.some(e=>storedEmails.includes(e));
+      if (parsedUsers && !hasValidUser) {
+        localStorage.removeItem(USERS_KEY);
+        sessionStorage.removeItem(SESSION_KEY);
+        setUsers(DEFAULT_USERS);
+        setAuthReady(true);
+        return;
+      }
       setUsers(parsedUsers || DEFAULT_USERS);
       const storedSession = sessionStorage.getItem(SESSION_KEY);
       if (storedSession) {
         const s = JSON.parse(storedSession);
-        // Validate session user still exists
         const liveUsers = parsedUsers || DEFAULT_USERS;
         if (liveUsers.find(u=>u.id===s.user?.id)) setSession(s);
       }
