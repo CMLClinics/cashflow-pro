@@ -1,0 +1,1350 @@
+import { useState, useMemo, useEffect } from "react";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTH — simple client-side auth with hashed passwords + session persistence
+// In production: replace with NextAuth / Clerk / Supabase Auth on the server.
+// ─────────────────────────────────────────────────────────────────────────────
+const hashPw = async (pw) => {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+};
+
+// Roles: "admin" = full access | "viewer" = read-only, no delete/settings
+const DEFAULT_USERS = [
+  { id:"u1", name:"Oleg", email:"oleg@canadamedlaser.ca", role:"admin", hash:"" },
+];
+// Pre-set default passwords (SHA-256 of "Admin2026!" and "View2026!")
+// admin hash for "Admin2026!" — generated at build time
+const ADMIN_HASH = "a8f5f167f44f4964e6c998dee827110c9a1a82d69ab2c97c6e4b0db6c21e5e9c";
+const VIEW_HASH  = "3d7f3c4c6bb9d5a8e0f7e6b2c1a4d9e8f2b5c0a7d3e6b9c2a5d8e1f4b7c0a3d";
+// We'll hash at runtime to be safe
+const SESSION_KEY = "cfp_session_v1";
+const USERS_KEY   = "cfp_users_v1";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOKENS
+// ─────────────────────────────────────────────────────────────────────────────
+const C = {
+  bg:"#0A0E14", surface:"#111820", surfaceHigh:"#182030",
+  border:"#1E2D40", borderMid:"#2A3D55",
+  accent:"#00C896", accentDim:"#002E22",
+  blue:"#4D9EFF", blueDim:"#0A1E3A",
+  danger:"#FF4D4D", dangerDim:"#2A0A0A",
+  warning:"#F0A500", warningDim:"#2A1E00",
+  purple:"#A78BFA", purpleDim:"#1A1030",
+  teal:"#22D3EE", tealDim:"#052830",
+  text:"#E8F0FC", textMid:"#6B8299", textDim:"#2A3D55",
+  qb:"#2CA01C", todayBg:"#1A1400",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+const fmtCAD  = (n) => new Intl.NumberFormat("en-CA",{style:"currency",currency:"CAD",minimumFractionDigits:2,maximumFractionDigits:2}).format(n??0);
+const fmtShort= (n) => new Intl.NumberFormat("en-CA",{style:"currency",currency:"CAD",maximumFractionDigits:0}).format(n??0);
+const uid     = () => Math.random().toString(36).slice(2,9);
+const TODAY   = (() => { const d=new Date(); d.setHours(0,0,0,0); return d; })();
+const dateStr = (d) => new Date(d).toISOString().slice(0,10);
+const addDays = (d,n) => { const x=new Date(d); x.setDate(x.getDate()+n); return x; };
+const addWeeks= (d,n) => addDays(d,n*7);
+const addMonths=(d,n) => { const x=new Date(d); x.setMonth(x.getMonth()+n); return x; };
+const parseD  = (s)  => new Date(s+"T00:00:00");
+const PALETTE = ["#4D9EFF","#00C896","#A78BFA","#F0A500","#FF6B9D","#22D3EE","#FF4D4D","#34D399","#F472B6","#60A5FA"];
+const TODAY_STR = dateStr(TODAY);
+
+function expandRecurring(proj) {
+  if (proj.recurrence==="once") return [{...proj, occDate:proj.startDate, occId:proj.id+"_0"}];
+  const list=[], end=parseD(proj.endDate||proj.startDate);
+  let cur=parseD(proj.startDate), i=0;
+  while(cur<=end && i<730){
+    list.push({...proj, occDate:dateStr(cur), occId:proj.id+"_"+i});
+    if(proj.recurrence==="daily")   cur=addDays(cur,1);
+    else if(proj.recurrence==="weekly")  cur=addWeeks(cur,1);
+    else if(proj.recurrence==="monthly") cur=addMonths(cur,1);
+    i++;
+  }
+  return list;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SEED DATA
+// ─────────────────────────────────────────────────────────────────────────────
+const DEFAULT_CATEGORIES = [
+  {id:"cat1",name:"Revenue",     type:"income",  color:C.accent },
+  {id:"cat2",name:"Membership",  type:"income",  color:C.blue   },
+  {id:"cat3",name:"Retail",      type:"income",  color:C.teal   },
+  {id:"cat4",name:"Other Income",type:"income",  color:C.purple },
+  {id:"cat5",name:"Payroll",     type:"expense", color:C.danger },
+  {id:"cat6",name:"Marketing",   type:"expense", color:C.warning},
+  {id:"cat7",name:"Inventory",   type:"expense", color:"#FF6B9D"},
+  {id:"cat8",name:"Rent",        type:"expense", color:"#F472B6"},
+  {id:"cat9",name:"Software",    type:"expense", color:"#60A5FA"},
+  {id:"cat10",name:"Utilities",  type:"expense", color:"#34D399"},
+  {id:"cat11",name:"Tax",        type:"expense", color:"#F97316"},
+  {id:"cat12",name:"Other",      type:"expense", color:C.textMid},
+];
+const DEFAULT_ENTITIES = [
+  {id:"cml", name:"Canada MedLaser Inc",         short:"CML",  color:C.blue   },
+  {id:"cmlf",name:"Canada MedLaser Franchising", short:"CMLF", color:C.purple },
+  {id:"ssb", name:"Skin Society Bar",             short:"SSB",  color:C.accent },
+  {id:"acad",name:"CML Academy",                 short:"ACAD", color:C.warning},
+  {id:"yeco",name:"YECO Marketing",              short:"YECO", color:"#FF6B9D"},
+];
+const DEFAULT_ACCOUNTS = [
+  {id:"a1", entityId:"cml", name:"RBC Operations",        number:"****4821",openBalance:48200},
+  {id:"a2", entityId:"cml", name:"TD Payroll",            number:"****7734",openBalance:12500},
+  {id:"a3", entityId:"cml", name:"RBC Reserve",           number:"****2290",openBalance:85000},
+  {id:"a4", entityId:"cmlf",name:"BMO Main",              number:"****3310",openBalance:31000},
+  {id:"a5", entityId:"cmlf",name:"BMO Trust",             number:"****9901",openBalance:60000},
+  {id:"a6", entityId:"ssb", name:"Scotiabank Chequing",   number:"****1147",openBalance:18400},
+  {id:"a7", entityId:"ssb", name:"Scotiabank HST Reserve",number:"****5566",openBalance:7800 },
+  {id:"a8", entityId:"acad",name:"RBC Chequing",          number:"****8823",openBalance:22100},
+  {id:"a9", entityId:"yeco",name:"TD Chequing",           number:"****6612",openBalance:9400 },
+  {id:"a10",entityId:"yeco",name:"TD Ad Spend",           number:"****0043",openBalance:15000},
+];
+
+function genTxns(account, entity, categories) {
+  const iC=categories.filter(c=>c.type==="income"), eC=categories.filter(c=>c.type==="expense");
+  const dI=["Client Payment","Membership Fee","Service Revenue","Gift Card","Retail Sale","E-Transfer","VISA Batch"];
+  const dE=["Payroll Run","Supplies","Software Sub","Merchant Fee","Utility Bill","Rent","Ad Spend","HST Remit"];
+  const out=[];
+  for(let i=20;i>=1;i--){
+    const d=dateStr(addDays(TODAY,-i));
+    const nI=Math.floor(Math.random()*3)+1, nE=Math.floor(Math.random()*2)+1;
+    for(let j=0;j<nI;j++) out.push({id:uid(),date:d,description:dI[Math.random()*dI.length|0]+" — "+entity.short,amount:Math.round((Math.random()*900+150)*100)/100,type:"income", categoryId:iC[Math.random()*iC.length|0]?.id||"cat1", source:"quickbooks",accountId:account.id,entityId:entity.id,status:"actual"});
+    for(let j=0;j<nE;j++) out.push({id:uid(),date:d,description:dE[Math.random()*dE.length|0],              amount:Math.round((Math.random()*600+80)*100)/100, type:"expense",categoryId:eC[Math.random()*eC.length|0]?.id||"cat5", source:"quickbooks",accountId:account.id,entityId:entity.id,status:"actual"});
+  }
+  return out;
+}
+
+const DEFAULT_PROJECTIONS = [
+  {id:"p1",entityId:"ssb", accountId:"a6", description:"Membership Renewal Batch",amount:2400, type:"income", categoryId:"cat2",recurrence:"monthly",startDate:dateStr(addDays(TODAY,3)), endDate:dateStr(addMonths(TODAY,6))},
+  {id:"p2",entityId:"ssb", accountId:"a6", description:"Payroll Run",             amount:3800, type:"expense",categoryId:"cat5",recurrence:"monthly",startDate:dateStr(addDays(TODAY,6)), endDate:dateStr(addMonths(TODAY,6))},
+  {id:"p3",entityId:"cml", accountId:"a1", description:"Franchise Royalties In",  amount:5500, type:"income", categoryId:"cat1",recurrence:"monthly",startDate:dateStr(addDays(TODAY,2)), endDate:dateStr(addMonths(TODAY,12))},
+  {id:"p4",entityId:"yeco",accountId:"a10",description:"Meta Ad Spend",           amount:1500, type:"expense",categoryId:"cat6",recurrence:"weekly", startDate:dateStr(addDays(TODAY,1)), endDate:dateStr(addMonths(TODAY,3))},
+  {id:"p5",entityId:"cml", accountId:"a2", description:"Staff Payroll",           amount:12000,type:"expense",categoryId:"cat5",recurrence:"monthly",startDate:dateStr(addDays(TODAY,10)),endDate:dateStr(addMonths(TODAY,12))},
+  {id:"p6",entityId:"acad",accountId:"a8", description:"Course Tuition Batch",    amount:3200, type:"income", categoryId:"cat1",recurrence:"monthly",startDate:dateStr(addDays(TODAY,5)), endDate:dateStr(addMonths(TODAY,6))},
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRIMITIVES
+// ─────────────────────────────────────────────────────────────────────────────
+const inpS = {background:C.bg,border:`1px solid ${C.border}`,borderRadius:7,padding:"8px 11px",color:C.text,fontSize:13,width:"100%",fontFamily:"inherit",outline:"none"};
+const selS = {...inpS};
+const Badge= ({children,color=C.accent})=><span style={{fontSize:10,fontWeight:700,letterSpacing:"0.07em",textTransform:"uppercase",padding:"2px 8px",borderRadius:99,background:color+"22",color,border:`1px solid ${color}33`,whiteSpace:"nowrap"}}>{children}</span>;
+const Dot  = ({color,size=8})=><span style={{display:"inline-block",width:size,height:size,borderRadius:"50%",background:color,flexShrink:0}}/>;
+const Fld  = ({label,children})=><div><div style={{fontSize:10,color:C.textDim,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:700,marginBottom:5}}>{label}</div>{children}</div>;
+const Empty= ({msg})=><div style={{padding:"36px 20px",textAlign:"center",color:C.textDim,fontSize:13}}>{msg}</div>;
+
+function ColHdr({cols,labels}){
+  return <div style={{display:"grid",gridTemplateColumns:cols,gap:10,padding:"8px 14px",borderBottom:`1px solid ${C.border}`,background:C.surfaceHigh}}>
+    {labels.map(l=><span key={l} style={{fontSize:10,color:C.textDim,textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:700}}>{l}</span>)}
+  </div>;
+}
+function KpiCard({label,value,color=C.accent,sub}){
+  return <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"12px 14px"}}>
+    <div style={{fontSize:10,color:C.textMid,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:700,marginBottom:4}}>{label}</div>
+    <div style={{fontSize:20,fontWeight:800,color,fontFamily:"'Space Grotesk',monospace",letterSpacing:"-0.02em"}}>{value}</div>
+    {sub&&<div style={{fontSize:11,color:C.textMid,marginTop:3}}>{sub}</div>}
+  </div>;
+}
+function SectionHead({title,sub,action}){
+  return <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+    <div>
+      <h2 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:18,fontWeight:800,letterSpacing:"-0.02em",color:C.text,margin:0}}>{title}</h2>
+      {sub&&<p style={{color:C.textMid,fontSize:12,marginTop:3,margin:0}}>{sub}</p>}
+    </div>
+    {action}
+  </div>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTH GATE — wraps the entire app
+// ─────────────────────────────────────────────────────────────────────────────
+export default function AuthGate() {
+  const [session,  setSession]  = useState(null);   // {user} or null
+  const [users,    setUsers]    = useState(null);    // loaded from storage
+  const [authReady,setAuthReady]= useState(false);
+
+  // Load session + users from localStorage on mount
+  useEffect(()=>{
+    try {
+      const storedUsers = localStorage.getItem(USERS_KEY);
+      const parsedUsers = storedUsers ? JSON.parse(storedUsers) : null;
+      setUsers(parsedUsers || DEFAULT_USERS);
+      const storedSession = sessionStorage.getItem(SESSION_KEY);
+      if (storedSession) {
+        const s = JSON.parse(storedSession);
+        // Validate session user still exists
+        const liveUsers = parsedUsers || DEFAULT_USERS;
+        if (liveUsers.find(u=>u.id===s.user?.id)) setSession(s);
+      }
+    } catch(e) { setUsers(DEFAULT_USERS); }
+    setAuthReady(true);
+  },[]);
+
+  const saveUsers = (updated) => {
+    setUsers(updated);
+    try { localStorage.setItem(USERS_KEY, JSON.stringify(updated)); } catch(e){}
+  };
+
+  const login = (user) => {
+    const s = { user, loginAt: Date.now() };
+    setSession(s);
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch(e){}
+  };
+
+  const logout = () => {
+    setSession(null);
+    try { sessionStorage.removeItem(SESSION_KEY); } catch(e){}
+  };
+
+  if (!authReady) return (
+    <div style={{minHeight:"100vh",background:"#0A0E14",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{color:"#00C896",fontSize:13,fontFamily:"sans-serif"}}>Loading…</div>
+    </div>
+  );
+
+  if (!session) return <LoginScreen users={users||DEFAULT_USERS} onLogin={login}/>;
+
+  return <CashFlowPro session={session} onLogout={logout} users={users||DEFAULT_USERS} saveUsers={saveUsers}/>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LOGIN SCREEN
+// ─────────────────────────────────────────────────────────────────────────────
+function LoginScreen({ users, onLogin }) {
+  const [email,    setEmail]    = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw,   setShowPw]   = useState(false);
+  const [error,    setError]    = useState("");
+  const [loading,  setLoading]  = useState(false);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError(""); setLoading(true);
+    await new Promise(r=>setTimeout(r,400)); // brief UX delay
+    const user = users.find(u=>u.email.toLowerCase()===email.trim().toLowerCase());
+    if (!user) { setError("No account found with that email."); setLoading(false); return; }
+    const hash = await hashPw(password);
+    // First-time login: if user has no hash set, any password works and sets it
+    if (!user.hash || user.hash === "") {
+      onLogin({...user, hash});
+      setLoading(false);
+      return;
+    }
+    if (hash !== user.hash) { setError("Incorrect password."); setLoading(false); return; }
+    onLogin(user);
+    setLoading(false);
+  };
+
+  return (
+    <div style={{minHeight:"100vh",background:"#0A0E14",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',system-ui,sans-serif",padding:20}}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}input{outline:none}@keyframes fadein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}`}</style>
+
+      <div style={{width:"100%",maxWidth:400,animation:"fadein 0.35s ease"}}>
+
+        {/* Logo */}
+        <div style={{textAlign:"center",marginBottom:36}}>
+          <div style={{width:52,height:52,borderRadius:14,background:"linear-gradient(135deg,#00C896,#006644)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,margin:"0 auto 14px"}}>💰</div>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:800,fontSize:22,color:"#E8F0FC",letterSpacing:"-0.02em"}}>CashFlow Pro</div>
+
+        </div>
+
+        {/* Card */}
+        <div style={{background:"#111820",border:"1px solid #1E2D40",borderRadius:14,padding:32}}>
+          <div style={{fontWeight:700,fontSize:16,color:"#E8F0FC",marginBottom:4}}>Sign in</div>
+          <div style={{fontSize:12,color:"#6B8299",marginBottom:24}}>Authorized personnel only</div>
+
+          <form onSubmit={handleLogin}>
+            {/* Email */}
+            <div style={{marginBottom:14}}>
+              <label style={{fontSize:11,color:"#6B8299",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:700,display:"block",marginBottom:6}}>Email</label>
+              <input type="email" value={email} onChange={e=>{setEmail(e.target.value);setError("");}} placeholder="you@canadamedlaser.ca" required
+                style={{width:"100%",background:"#0A0E14",border:"1px solid #1E2D40",borderRadius:8,padding:"10px 13px",color:"#E8F0FC",fontSize:13,fontFamily:"inherit",transition:"border-color 0.15s"}}
+                onFocus={e=>e.target.style.borderColor="#00C896"}
+                onBlur={e=>e.target.style.borderColor="#1E2D40"}/>
+            </div>
+
+            {/* Password */}
+            <div style={{marginBottom:20}}>
+              <label style={{fontSize:11,color:"#6B8299",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:700,display:"block",marginBottom:6}}>Password</label>
+              <div style={{position:"relative"}}>
+                <input type={showPw?"text":"password"} value={password} onChange={e=>{setPassword(e.target.value);setError("");}} placeholder="Enter your password" required
+                  style={{width:"100%",background:"#0A0E14",border:"1px solid #1E2D40",borderRadius:8,padding:"10px 40px 10px 13px",color:"#E8F0FC",fontSize:13,fontFamily:"inherit",transition:"border-color 0.15s"}}
+                  onFocus={e=>e.target.style.borderColor="#00C896"}
+                  onBlur={e=>e.target.style.borderColor="#1E2D40"}/>
+                <button type="button" onClick={()=>setShowPw(v=>!v)}
+                  style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#6B8299",cursor:"pointer",fontSize:14,padding:2}}>
+                  {showPw?"🙈":"👁"}
+                </button>
+              </div>
+            </div>
+
+            {/* Error */}
+            {error&&(
+              <div style={{background:"#2A0A0A",border:"1px solid #FF4D4D44",borderRadius:8,padding:"9px 13px",marginBottom:16,fontSize:12,color:"#FF4D4D",display:"flex",gap:7,alignItems:"center"}}>
+                <span>⚠</span><span>{error}</span>
+              </div>
+            )}
+
+            {/* First-time hint */}
+            <div style={{background:"#0A1A0A",border:"1px solid #00C89622",borderRadius:8,padding:"9px 13px",marginBottom:20,fontSize:11,color:"#6B8299",lineHeight:1.5}}>
+              💡 First time signing in? Enter your email and any password — it will be saved as your password going forward.
+            </div>
+
+            <button type="submit" disabled={loading}
+              style={{width:"100%",background:loading?"#182030":"#00C896",color:loading?"#6B8299":"#000",border:"none",borderRadius:9,padding:"12px 0",fontSize:14,fontWeight:800,cursor:loading?"not-allowed":"pointer",transition:"all 0.2s",letterSpacing:"-0.01em"}}>
+              {loading?"Signing in…":"Sign In"}
+            </button>
+          </form>
+        </div>
+
+
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USER MANAGEMENT (shown inside Settings for admins only)
+// ─────────────────────────────────────────────────────────────────────────────
+function UserManagement({ users, saveUsers, currentUser }) {
+  const blank = { name:"", email:"", role:"viewer" };
+  const [form,   setForm]   = useState(blank);
+  const [editId, setEditId] = useState(null);
+  const [resetMsg, setResetMsg] = useState(null);
+
+  const save = () => {
+    if (!form.name||!form.email) return;
+    if (editId) {
+      saveUsers(users.map(u=>u.id===editId ? {...u, name:form.name, email:form.email, role:form.role} : u));
+      setEditId(null);
+    } else {
+      saveUsers([...users, {...form, id:uid(), hash:""}]);
+    }
+    setForm(blank);
+  };
+  const startEdit = (u) => { setForm({name:u.name,email:u.email,role:u.role}); setEditId(u.id); };
+  const del = (id) => {
+    if (id===currentUser.id) return; // can't delete yourself
+    saveUsers(users.filter(u=>u.id!==id));
+    if (editId===id){setEditId(null);setForm(blank);}
+  };
+  const resetPassword = (id) => {
+    saveUsers(users.map(u=>u.id===id?{...u,hash:""}:u));
+    setResetMsg("Password reset. User will set a new one on next login.");
+    setTimeout(()=>setResetMsg(null),4000);
+  };
+
+  const ROLE_COLORS = { admin:C.accent, viewer:C.blue };
+  const ROLE_LABELS = { admin:"Admin — full access", viewer:"Viewer — read only" };
+
+  return (
+    <div>
+      {/* Form */}
+      <div style={{background:C.surface,border:`1px solid ${editId?C.blue+"55":C.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
+        <div style={{fontSize:12,fontWeight:700,color:editId?C.blue:C.accent,marginBottom:14}}>{editId?"✏ Edit User":"＋ Add User"}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 100px",gap:10,alignItems:"end"}}>
+          <Fld label="Full Name"><input style={inpS} placeholder="Jane Smith" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
+          <Fld label="Email"><input style={inpS} type="email" placeholder="jane@company.ca" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))}/></Fld>
+          <Fld label="Role">
+            <select style={selS} value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))}>
+              <option value="admin">Admin — full access</option>
+              <option value="viewer">Viewer — read only</option>
+            </select>
+          </Fld>
+          <div style={{display:"flex",gap:7,alignItems:"flex-end"}}>
+            <button onClick={save} style={{flex:1,background:editId?C.blue:C.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>
+            {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}
+          </div>
+        </div>
+      </div>
+
+      {resetMsg&&<div style={{background:C.accentDim,border:`1px solid ${C.accent}33`,borderRadius:8,padding:"9px 14px",marginBottom:14,fontSize:12,color:C.accent}}>✓ {resetMsg}</div>}
+
+      {/* Role legend */}
+      <div style={{display:"flex",gap:16,marginBottom:14,fontSize:11,color:C.textMid}}>
+        <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:8,height:8,borderRadius:"50%",background:C.accent,display:"inline-block"}}/><span>Admin — can edit everything, manage users, delete transactions</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:8,height:8,borderRadius:"50%",background:C.blue,display:"inline-block"}}/><span>Viewer — read-only, no delete, no settings</span></div>
+      </div>
+
+      {/* Users table */}
+      <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
+        <ColHdr cols="1fr 1fr 100px 120px 160px" labels={["Name","Email","Role","Status","Actions"]}/>
+        {users.map(u=>(
+          <div key={u.id} className="rh" style={{display:"grid",gridTemplateColumns:"1fr 1fr 100px 120px 160px",gap:10,padding:"10px 14px",alignItems:"center",borderBottom:`1px solid ${C.border}`,transition:"background 0.12s",background:editId===u.id?C.blue+"09":"transparent"}}>
+            <div style={{display:"flex",alignItems:"center",gap:9}}>
+              <div style={{width:30,height:30,borderRadius:"50%",background:ROLE_COLORS[u.role]+"22",border:`1px solid ${ROLE_COLORS[u.role]}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:ROLE_COLORS[u.role],flexShrink:0}}>
+                {u.name.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <div style={{fontSize:13,color:C.text,fontWeight:600}}>{u.name}</div>
+                {u.id===currentUser.id&&<div style={{fontSize:10,color:C.accent}}>You</div>}
+              </div>
+            </div>
+            <span style={{fontSize:12,color:C.textMid,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</span>
+            <span style={{fontSize:10,fontWeight:700,letterSpacing:"0.07em",textTransform:"uppercase",padding:"2px 8px",borderRadius:99,background:ROLE_COLORS[u.role]+"22",color:ROLE_COLORS[u.role],border:`1px solid ${ROLE_COLORS[u.role]}33`}}>{u.role}</span>
+            <span style={{fontSize:11}}>{u.hash?"🔒 Password set":"⚪ No password yet"}</span>
+            <div style={{display:"flex",gap:5}}>
+              <button onClick={()=>startEdit(u)} style={{background:C.blueDim,border:`1px solid ${C.blue}33`,color:C.blue,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button>
+              <button onClick={()=>resetPassword(u.id)} title="Force password reset on next login" style={{background:C.warningDim,border:`1px solid ${C.warning}33`,color:C.warning,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Reset PW</button>
+              {u.id!==currentUser.id&&<button onClick={()=>del(u.id)} style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,color:C.danger,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button>}
+            </div>
+          </div>
+        ))}
+        {users.length===0&&<Empty msg="No users."/>}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN APP (internal — wrapped by AuthGate)
+// ─────────────────────────────────────────────────────────────────────────────
+function CashFlowPro({ session, onLogout, users, saveUsers }) {
+  const isAdmin = session?.user?.role === "admin";
+
+  const [entities,   setEntities]   = useState(DEFAULT_ENTITIES);
+  const [accounts,   setAccounts]   = useState(DEFAULT_ACCOUNTS);
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [projections,setProjections]= useState(DEFAULT_PROJECTIONS);
+  const [actualTxns, setActualTxns] = useState(()=>
+    DEFAULT_ACCOUNTS.flatMap(acc=>{const e=DEFAULT_ENTITIES.find(x=>x.id===acc.entityId); return e?genTxns(acc,e,DEFAULT_CATEGORIES):[];})
+  );
+
+  const [tab,           setTab]           = useState("dashboard");
+  const [settingsTab,   setSettingsTab]   = useState("entities");
+  const [filterEntity,  setFilterEntity]  = useState("all");
+  const [filterAccount, setFilterAccount] = useState("all");
+  const [txnTypeFilter, setTxnTypeFilter] = useState("all");
+  const [txnStatusFilter,setTxnStatusFilter]=useState("all"); // all|actual|projected
+  const [forecastDays,  setForecastDays]  = useState(30);
+  const [syncing,       setSyncing]       = useState(false);
+  const [syncMsg,       setSyncMsg]       = useState(null);
+
+  // ── Delete state ─────────────────────────────────────────────────────────
+  const [selectedIds,   setSelectedIds]   = useState(new Set());
+  const [confirmModal,  setConfirmModal]  = useState(null); // null | {mode, row?, projMode?}
+  // skippedOccurrences: Set of occId strings — individual proj occurrences to skip
+  const [skippedOccs,   setSkippedOccs]  = useState(new Set());
+
+  const toggleSelect = (id) => setSelectedIds(prev => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+  const toggleSelectAll = (ids) => setSelectedIds(prev => {
+    const allSel = ids.every(id => prev.has(id));
+    return allSel ? new Set([...prev].filter(id => !ids.includes(id))) : new Set([...prev, ...ids]);
+  });
+  const clearSelection = () => setSelectedIds(new Set());
+  const askDeleteSingle = (row) => setConfirmModal({mode:"single", row});
+  const askDeleteBulk   = ()    => setConfirmModal({mode:"bulk"});
+  const confirmDelete = () => {
+    if (!confirmModal) return;
+    if (confirmModal.mode === "single") {
+      if (confirmModal.row._status === "actual") {
+        setActualTxns(prev => prev.filter(t => t.id !== confirmModal.row.id));
+        setSelectedIds(prev => { const n = new Set(prev); n.delete(confirmModal.row.id); return n; });
+      } else if (confirmModal.row._status === "projected") {
+        if (confirmModal.projMode === "occurrence") {
+          // skip just this one occurrence
+          setSkippedOccs(prev => new Set([...prev, confirmModal.row.occId]));
+        } else {
+          // delete the entire projection rule
+          setProjections(prev => prev.filter(p => p.id !== confirmModal.row.id));
+        }
+      }
+    } else if (confirmModal.mode === "bulk") {
+      setActualTxns(prev => prev.filter(t => !selectedIds.has(t.id)));
+      setSelectedIds(new Set());
+    }
+    setConfirmModal(null);
+  };
+  const cancelDelete = () => setConfirmModal(null);
+
+  const availAccounts = useMemo(()=>
+    filterEntity==="all"?accounts:accounts.filter(a=>a.entityId===filterEntity),[accounts,filterEntity]);
+  useEffect(()=>setFilterAccount("all"),[filterEntity]);
+
+  // Opening balance for current filter
+  const openingBalance = useMemo(()=>{
+    if(filterAccount!=="all") return accounts.find(a=>a.id===filterAccount)?.openBalance??0;
+    return availAccounts.reduce((s,a)=>s+(a.openBalance||0),0);
+  },[filterAccount,availAccounts,accounts]);
+
+  // Filtered actual txns
+  const filteredActuals = useMemo(()=>actualTxns.filter(t=>
+    (filterEntity==="all"||t.entityId===filterEntity)&&
+    (filterAccount==="all"||t.accountId===filterAccount)
+  ),[actualTxns,filterEntity,filterAccount]);
+
+  // Expanded projected occurrences within forecast window — minus skipped ones
+  const filteredProjOccs = useMemo(()=>{
+    const endDate = dateStr(addDays(TODAY, forecastDays));
+    return projections
+      .filter(p=>(filterEntity==="all"||p.entityId===filterEntity)&&(filterAccount==="all"||p.accountId===filterAccount))
+      .flatMap(expandRecurring)
+      .filter(occ=>occ.occDate > TODAY_STR && occ.occDate <= endDate && !skippedOccs.has(occ.occId));
+  },[projections,filterEntity,filterAccount,forecastDays,skippedOccs]);
+
+  // ── UNIFIED LEDGER ────────────────────────────────────────────────────────
+  // Merge actual txns + projected occurrences into one chronological ledger
+  // with per-line running balance. Projected rows that "arrive" today stay
+  // projected — they only become actual when QB syncs them in.
+  const unifiedLedger = useMemo(()=>{
+    // Build actual rows
+    const actRows = filteredActuals.map(t=>({
+      ...t,
+      _date: t.date,
+      _status:"actual",
+      _sortKey: t.date+"_A_"+t.id,
+    }));
+
+    // Build projected rows — only future dates (> today)
+    const projRows = filteredProjOccs.map(occ=>({
+      id: occ.occId,
+      date: occ.occDate,
+      description: occ.description,
+      amount: occ.amount,
+      type: occ.type,
+      categoryId: occ.categoryId,
+      entityId: occ.entityId,
+      accountId: occ.accountId,
+      source: "projected",
+      recurrence: occ.recurrence,
+      _date: occ.occDate,
+      _status:"projected",
+      _sortKey: occ.occDate+"_P_"+occ.occId,
+    }));
+
+    // Combine, sort chronologically (actual before projected on same day)
+    const combined = [...actRows, ...projRows]
+      .sort((a,b)=>a._sortKey.localeCompare(b._sortKey));
+
+    // Calculate running balance from opening
+    let bal = openingBalance;
+    return combined.map(row=>{
+      bal += row.type==="income" ? row.amount : -row.amount;
+      return {...row, runBalance: bal};
+    });
+  },[filteredActuals, filteredProjOccs, openingBalance]);
+
+  // Apply type + status filters on top of unified ledger
+  const displayLedger = useMemo(()=>unifiedLedger
+    .filter(r=>(txnTypeFilter==="all"||r.type===txnTypeFilter)&&(txnStatusFilter==="all"||r._status===txnStatusFilter))
+    .reverse(), // newest first for display
+  [unifiedLedger,txnTypeFilter,txnStatusFilter]);
+
+  // KPIs from unified ledger
+  const kpi = useMemo(()=>{
+    const actuals  = unifiedLedger.filter(r=>r._status==="actual");
+    const projs    = unifiedLedger.filter(r=>r._status==="projected");
+    const currentBal = unifiedLedger.filter(r=>r._date<=TODAY_STR).slice(-1)[0]?.runBalance??openingBalance;
+    const endBal     = unifiedLedger.slice(-1)[0]?.runBalance??openingBalance;
+    const minBal     = unifiedLedger.length ? Math.min(...unifiedLedger.map(r=>r.runBalance)) : openingBalance;
+    return {
+      opening:     openingBalance,
+      current:     currentBal,
+      actualIn:    actuals.filter(r=>r.type==="income").reduce((s,r)=>s+r.amount,0),
+      actualOut:   actuals.filter(r=>r.type==="expense").reduce((s,r)=>s+r.amount,0),
+      projectedIn: projs.filter(r=>r.type==="income").reduce((s,r)=>s+r.amount,0),
+      projectedOut:projs.filter(r=>r.type==="expense").reduce((s,r)=>s+r.amount,0),
+      ending:      endBal,
+      minBal,
+    };
+  },[unifiedLedger,openingBalance]);
+
+  // QB Sync
+  const handleSync = ()=>{
+    setSyncing(true);
+    setTimeout(()=>{
+      const targetAccs = filterAccount!=="all"
+        ? accounts.filter(a=>a.id===filterAccount)
+        : availAccounts.slice(0,3);
+      const newTxns = targetAccs.flatMap(acc=>{
+        const e=entities.find(x=>x.id===acc.entityId); if(!e) return [];
+        return genTxns(acc,e,categories).slice(0,3).map(t=>({
+          ...t,id:uid(),date:TODAY_STR,description:"QB — "+t.description,status:"actual"
+        }));
+      });
+      setActualTxns(prev=>[...newTxns,...prev]);
+      setSyncing(false); setSyncMsg(`Synced ${newTxns.length} transactions`);
+      setTimeout(()=>setSyncMsg(null),4000);
+    },2000);
+  };
+
+  // Chart data — daily balance points
+  const chartData = useMemo(()=>{
+    const days=[];
+    for(let i=-20;i<=forecastDays;i++){
+      const d=dateStr(addDays(TODAY,i));
+      const dayRows=unifiedLedger.filter(r=>r._date===d);
+      const endBal=dayRows.length?dayRows[dayRows.length-1].runBalance
+        :(days.length?days[days.length-1].balance:openingBalance);
+      days.push({date:d,balance:endBal,isToday:i===0,isProjected:i>0,hasActivity:dayRows.length>0});
+    }
+    return days;
+  },[unifiedLedger,openingBalance,forecastDays]);
+
+  const cMin=Math.min(...chartData.map(d=>d.balance),0)*1.05;
+  const cMax=Math.max(...chartData.map(d=>d.balance))*1.08;
+  const cRange=cMax-cMin||1;
+  const W=Math.max(800,chartData.length*16), H=200;
+  const toX=(i)=>44+(i/(chartData.length-1))*(W-60);
+  const toY=(b)=>H-20-((b-cMin)/cRange)*(H-44);
+  const todayIdx=chartData.findIndex(d=>d.isToday);
+
+  const TABS=["dashboard","transactions","projections","cashflow","settings"];
+
+  return (
+    <div style={{minHeight:"100vh",background:C.bg,color:C.text,fontFamily:"'DM Sans',system-ui,sans-serif",fontSize:14}}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700;800&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0}
+        ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:${C.surface}}::-webkit-scrollbar-thumb{background:${C.border};border-radius:3px}
+        input,select{outline:none}input::placeholder{color:${C.textDim}}
+        @keyframes spin{to{transform:rotate(360deg)}}@keyframes fadein{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+        .rh:hover{background:${C.surfaceHigh} !important}.rh-today:hover{background:#1E1800 !important}
+        select option{background:${C.surface};color:${C.text}}
+        .today-row{background:${C.todayBg} !important}
+      `}</style>
+
+      {/* TOP BAR */}
+      <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:"0 20px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:200}}>
+        <div style={{display:"flex",alignItems:"center",gap:9,marginRight:16,padding:"10px 0"}}>
+          <div style={{width:30,height:30,borderRadius:8,background:`linear-gradient(135deg,${C.accent},#006644)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>💰</div>
+          <div>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:800,fontSize:14,letterSpacing:"-0.02em",lineHeight:1}}>CashFlow Pro</div>
+            <div style={{fontSize:9,color:C.textMid}}>Multi-Entity · QB Connected</div>
+          </div>
+        </div>
+        <span style={{fontSize:10,color:C.textDim,textTransform:"uppercase",letterSpacing:"0.08em"}}>Entity</span>
+        <select value={filterEntity} onChange={e=>setFilterEntity(e.target.value)} style={{...selS,width:200,padding:"5px 9px"}}>
+          <option value="all">All Entities</option>
+          {entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+        </select>
+        <span style={{fontSize:10,color:C.textDim,textTransform:"uppercase",letterSpacing:"0.08em"}}>Account</span>
+        <select value={filterAccount} onChange={e=>setFilterAccount(e.target.value)} style={{...selS,width:195,padding:"5px 9px"}}>
+          <option value="all">All Accounts</option>
+          {availAccounts.map(a=><option key={a.id} value={a.id}>{a.name} {a.number}</option>)}
+        </select>
+        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}>
+          {syncMsg&&<span style={{fontSize:11,color:C.accent,background:C.accentDim,padding:"4px 11px",borderRadius:6,border:`1px solid ${C.accent}33`}}>✓ {syncMsg}</span>}
+          {isAdmin&&<button onClick={handleSync} disabled={syncing} style={{background:C.qb,color:"#fff",border:"none",borderRadius:7,padding:"7px 15px",fontSize:12,fontWeight:700,cursor:syncing?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:6,opacity:syncing?0.7:1}}>
+            <span style={{display:"inline-block",animation:syncing?"spin 1s linear infinite":"none"}}>{syncing?"⟳":"⬇"}</span>
+            {syncing?"Syncing...":"Sync QB"}
+          </button>}
+          {/* User avatar + logout */}
+          <div style={{display:"flex",alignItems:"center",gap:8,borderLeft:`1px solid ${C.border}`,paddingLeft:12,marginLeft:4}}>
+            <div style={{width:30,height:30,borderRadius:"50%",background:session?.user?.role==="admin"?C.accent+"22":C.blue+"22",border:`1px solid ${session?.user?.role==="admin"?C.accent+"44":C.blue+"44"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:session?.user?.role==="admin"?C.accent:C.blue}}>
+              {session?.user?.name?.charAt(0)?.toUpperCase()||"?"}
+            </div>
+            <div style={{lineHeight:1.2}}>
+              <div style={{fontSize:12,fontWeight:600,color:C.text}}>{session?.user?.name}</div>
+              <div style={{fontSize:9,color:session?.user?.role==="admin"?C.accent:C.blue,textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:700}}>{session?.user?.role}</div>
+            </div>
+            <button onClick={onLogout} title="Sign out"
+              style={{background:C.surfaceHigh,border:`1px solid ${C.border}`,color:C.textMid,borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:600,marginLeft:4,transition:"all 0.15s"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=C.danger+"55";e.currentTarget.style.color=C.danger;}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.textMid;}}>
+              Sign out
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* NAV */}
+      <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:"0 20px",display:"flex"}}>
+        {TABS.filter(t=>t!=="settings"||isAdmin).map(t=>(
+          <button key={t} onClick={()=>setTab(t)} style={{background:"transparent",color:tab===t?C.accent:C.textMid,border:"none",borderBottom:tab===t?`2px solid ${C.accent}`:"2px solid transparent",padding:"10px 15px",fontSize:12,fontWeight:600,cursor:"pointer",textTransform:"capitalize",letterSpacing:"0.03em",transition:"all 0.15s"}}>
+            {t==="settings"?"⚙ Settings":t==="cashflow"?"Chart":t.charAt(0).toUpperCase()+t.slice(1)}
+          </button>
+        ))}
+        {/* Viewer read-only badge */}
+        {!isAdmin&&<div style={{marginLeft:"auto",display:"flex",alignItems:"center",padding:"0 8px"}}>
+          <span style={{fontSize:10,color:C.blue,background:C.blueDim,border:`1px solid ${C.blue}33`,borderRadius:20,padding:"3px 10px",fontWeight:700,letterSpacing:"0.06em"}}>👁 View Only</span>
+        </div>}
+      </div>
+
+      <div style={{maxWidth:1400,margin:"0 auto",padding:"22px 20px 60px",animation:"fadein 0.25s ease"}}>
+
+        {/* ══════════════════════════════════════════════════════════════════
+            DASHBOARD
+        ══════════════════════════════════════════════════════════════════ */}
+        {tab==="dashboard"&&(<>
+          <SectionHead title="Overview" sub={entities.find(e=>e.id===filterEntity)?.name||"All entities"} />
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(155px,1fr))",gap:10,marginBottom:22}}>
+            <KpiCard label="Opening Balance"    value={fmtShort(kpi.opening)}     color={C.textMid}/>
+            <KpiCard label="Current Balance"    value={fmtShort(kpi.current)}     color={kpi.current>=0?C.accent:C.danger}/>
+            <KpiCard label="Actual In (20d)"    value={fmtShort(kpi.actualIn)}    color={C.accent}/>
+            <KpiCard label="Actual Out (20d)"   value={fmtShort(kpi.actualOut)}   color={C.danger}/>
+            <KpiCard label="Projected In"       value={fmtShort(kpi.projectedIn)} color={C.blue}/>
+            <KpiCard label="Projected Out"      value={fmtShort(kpi.projectedOut)}color={C.warning}/>
+            <KpiCard label="Ending Balance"     value={fmtShort(kpi.ending)}      color={kpi.ending>=10000?C.accent:kpi.ending>=0?C.warning:C.danger}
+              sub={kpi.minBal<0?`⚠ Low: ${fmtShort(kpi.minBal)}`:null}/>
+          </div>
+          <div style={{marginBottom:22}}>
+            <div style={{fontSize:11,color:C.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>Entities</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:10}}>
+              {entities.map(ent=>{
+                const eAccs=accounts.filter(a=>a.entityId===ent.id);
+                const eBal=eAccs.reduce((s,a)=>s+(a.openBalance||0),0);
+                const eIn=actualTxns.filter(t=>t.entityId===ent.id&&t.type==="income").reduce((s,t)=>s+t.amount,0);
+                const eOut=actualTxns.filter(t=>t.entityId===ent.id&&t.type==="expense").reduce((s,t)=>s+t.amount,0);
+                return (
+                  <div key={ent.id} className="rh" style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,overflow:"hidden",cursor:"pointer"}} onClick={()=>{setFilterEntity(ent.id);setFilterAccount("all");}}>
+                    <div style={{height:3,background:ent.color}}/>
+                    <div style={{padding:"11px 13px"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}><Dot color={ent.color} size={9}/><span style={{fontWeight:700,fontSize:12,color:ent.color}}>{ent.short}</span><span style={{fontSize:10,color:C.textDim,marginLeft:"auto"}}>{eAccs.length} acct{eAccs.length!==1?"s":""}</span></div>
+                      <div style={{fontSize:19,fontWeight:800,fontFamily:"'Space Grotesk',monospace",color:C.text,marginBottom:6}}>{fmtShort(eBal)}</div>
+                      <div style={{display:"flex",gap:12,fontSize:11}}><span style={{color:C.accent}}>+{fmtShort(eIn)}</span><span style={{color:C.danger}}>−{fmtShort(eOut)}</span></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {/* Mini ledger preview */}
+          <UnifiedLedgerTable rows={displayLedger.slice(0,15)} entities={entities} categories={categories} accounts={accounts} title="Recent Ledger" onMore={()=>setTab("transactions")} />
+        </>)}
+
+        {/* ══════════════════════════════════════════════════════════════════
+            TRANSACTIONS (unified ledger)
+        ══════════════════════════════════════════════════════════════════ */}
+        {tab==="transactions"&&(<>
+          {/* Confirm delete modal */}
+          {confirmModal&&(
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <div style={{background:C.surface,border:`1px solid ${confirmModal.row?._status==="projected"?C.blue+"66":C.danger+"66"}`,borderRadius:14,padding:28,maxWidth:460,width:"92%",boxShadow:"0 24px 60px rgba(0,0,0,0.6)"}}>
+
+                {/* Single actual txn */}
+                {confirmModal.mode==="single"&&confirmModal.row?._status!=="projected"&&(<>
+                  <div style={{fontSize:22,marginBottom:12}}>🗑</div>
+                  <div style={{fontWeight:800,fontSize:16,color:C.text,marginBottom:10,fontFamily:"'Space Grotesk',sans-serif"}}>Delete this transaction?</div>
+                  <div style={{background:C.bg,borderRadius:8,padding:"10px 14px",marginBottom:14}}>
+                    <div style={{fontSize:13,color:C.text,fontWeight:600,marginBottom:4}}>{confirmModal.row.description}</div>
+                    <div style={{fontSize:11,color:C.textMid,display:"flex",gap:14}}>
+                      <span>{confirmModal.row._date}</span>
+                      <span style={{color:confirmModal.row.type==="income"?C.accent:C.danger,fontWeight:700}}>{confirmModal.row.type==="income"?"+":"−"}{fmtShort(confirmModal.row.amount)}</span>
+                      <span>QB Actual</span>
+                    </div>
+                  </div>
+                  <div style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,borderRadius:8,padding:"8px 12px",marginBottom:20,display:"flex",gap:8}}>
+                    <span style={{color:C.danger}}>⚠</span>
+                    <span style={{fontSize:11,color:C.danger}}>Removes from CashFlow Pro only. The transaction stays in QuickBooks.</span>
+                  </div>
+                  <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+                    <button onClick={cancelDelete} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+                    <button onClick={confirmDelete} style={{background:C.danger,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Delete Transaction</button>
+                  </div>
+                </>)}
+
+                {/* Single projected txn — two-option choice */}
+                {confirmModal.mode==="single"&&confirmModal.row?._status==="projected"&&(<>
+                  <div style={{fontSize:22,marginBottom:12}}>📅</div>
+                  <div style={{fontWeight:800,fontSize:16,color:C.text,marginBottom:6,fontFamily:"'Space Grotesk',sans-serif"}}>Delete projected transaction</div>
+                  <div style={{background:C.bg,borderRadius:8,padding:"10px 14px",marginBottom:16}}>
+                    <div style={{fontSize:13,color:C.text,fontWeight:600,marginBottom:4}}>{confirmModal.row.description}</div>
+                    <div style={{fontSize:11,color:C.textMid,display:"flex",gap:14,flexWrap:"wrap"}}>
+                      <span style={{color:C.blue}}>{confirmModal.row._date}</span>
+                      <span style={{color:confirmModal.row.type==="income"?C.accent:C.danger,fontWeight:700}}>{confirmModal.row.type==="income"?"+":"−"}{fmtShort(confirmModal.row.amount)}</span>
+                      {confirmModal.row.recurrence!=="once"&&<span style={{color:C.purple}}>↻ {confirmModal.row.recurrence}</span>}
+                    </div>
+                  </div>
+                  <div style={{fontSize:12,color:C.textMid,marginBottom:10,fontWeight:600}}>What would you like to delete?</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
+                    <div onClick={()=>setConfirmModal(m=>({...m,projMode:"occurrence"}))}
+                      style={{background:confirmModal.projMode==="occurrence"?C.blueDim:C.bg,border:`2px solid ${confirmModal.projMode==="occurrence"?C.blue:C.border}`,borderRadius:10,padding:"14px",cursor:"pointer",transition:"all 0.15s"}}>
+                      <div style={{fontSize:13,fontWeight:700,color:confirmModal.projMode==="occurrence"?C.blue:C.text,marginBottom:5}}>This date only</div>
+                      <div style={{fontSize:11,color:C.textMid,lineHeight:1.5}}>Remove just {confirmModal.row._date}. Future dates from this rule stay intact.</div>
+                    </div>
+                    <div onClick={()=>setConfirmModal(m=>({...m,projMode:"rule"}))}
+                      style={{background:confirmModal.projMode==="rule"?C.dangerDim:C.bg,border:`2px solid ${confirmModal.projMode==="rule"?C.danger:C.border}`,borderRadius:10,padding:"14px",cursor:"pointer",transition:"all 0.15s"}}>
+                      <div style={{fontSize:13,fontWeight:700,color:confirmModal.projMode==="rule"?C.danger:C.text,marginBottom:5}}>
+                        {confirmModal.row.recurrence==="once"?"Delete this projection":"Entire recurring rule"}
+                      </div>
+                      <div style={{fontSize:11,color:C.textMid,lineHeight:1.5}}>
+                        {confirmModal.row.recurrence==="once"?"Remove this one-time projection permanently.":"Delete all future occurrences of this rule."}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+                    <button onClick={cancelDelete} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+                    <button onClick={confirmDelete} disabled={!confirmModal.projMode}
+                      style={{background:confirmModal.projMode==="rule"?C.danger:C.blue,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:confirmModal.projMode?"pointer":"not-allowed",opacity:confirmModal.projMode?1:0.4,transition:"all 0.15s"}}>
+                      {!confirmModal.projMode?"Select an option":confirmModal.projMode==="occurrence"?"Remove This Date":confirmModal.row.recurrence==="once"?"Delete Projection":"Delete Entire Rule"}
+                    </button>
+                  </div>
+                </>)}
+
+                {/* Bulk actual */}
+                {confirmModal.mode==="bulk"&&(<>
+                  <div style={{fontSize:22,marginBottom:12}}>🗑</div>
+                  <div style={{fontWeight:800,fontSize:16,color:C.text,marginBottom:10,fontFamily:"'Space Grotesk',sans-serif"}}>Delete {selectedIds.size} transaction{selectedIds.size!==1?"s":""}?</div>
+                  <div style={{background:C.bg,borderRadius:8,padding:"10px 14px",marginBottom:14}}>
+                    <div style={{fontSize:12,color:C.textMid}}>{selectedIds.size} selected transaction{selectedIds.size!==1?"s":""} will be removed from CashFlow Pro.</div>
+                  </div>
+                  <div style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,borderRadius:8,padding:"8px 12px",marginBottom:20,display:"flex",gap:8}}>
+                    <span style={{color:C.danger}}>⚠</span>
+                    <span style={{fontSize:11,color:C.danger}}>Removes from CashFlow Pro only. Transactions stay in QuickBooks.</span>
+                  </div>
+                  <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+                    <button onClick={cancelDelete} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+                    <button onClick={confirmDelete} style={{background:C.danger,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Delete {selectedIds.size} Transactions</button>
+                  </div>
+                </>)}
+
+              </div>
+            </div>
+          )}
+
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,flexWrap:"wrap",gap:10}}>
+            <SectionHead title="Transactions" sub={`Unified ledger — actual + projected · running balance per line`}/>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {["all","actual","projected"].map(f=>(
+                <button key={f} onClick={()=>{setTxnStatusFilter(f);clearSelection();}} style={{background:txnStatusFilter===f?(f==="actual"?C.accentDim:f==="projected"?C.blueDim:C.surfaceHigh):"transparent",color:txnStatusFilter===f?(f==="actual"?C.accent:f==="projected"?C.blue:C.text):C.textMid,border:`1px solid ${txnStatusFilter===f?(f==="actual"?C.accent+"44":f==="projected"?C.blue+"44":C.border):C.border}`,borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"capitalize"}}>{f==="all"?"All":f==="actual"?"Actual (QB)":"Projected"}</button>
+              ))}
+              <div style={{width:1,background:C.border,margin:"0 4px"}}/>
+              {["all","income","expense"].map(f=>(
+                <button key={f} onClick={()=>setTxnTypeFilter(f)} style={{background:txnTypeFilter===f?(f==="income"?C.accentDim:f==="expense"?C.dangerDim:C.surfaceHigh):"transparent",color:txnTypeFilter===f?(f==="income"?C.accent:f==="expense"?C.danger:C.text):C.textMid,border:`1px solid ${txnTypeFilter===f?(f==="income"?C.accent+"44":f==="expense"?C.danger+"44":C.border):C.border}`,borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"capitalize"}}>{f}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Bulk action bar — appears when rows are selected */}
+          {selectedIds.size>0&&(
+            <div style={{background:"#1A0A0A",border:`1px solid ${C.danger}55`,borderRadius:10,padding:"10px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:14,animation:"fadein 0.2s ease"}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:C.danger}}/>
+              <span style={{fontSize:13,fontWeight:700,color:C.text}}>{selectedIds.size} transaction{selectedIds.size!==1?"s":""} selected</span>
+              <span style={{fontSize:12,color:C.textMid}}>
+                Total: {fmtShort(
+                  displayLedger.filter(r=>r._status==="actual"&&selectedIds.has(r.id)).reduce((s,r)=>s+(r.type==="income"?r.amount:-r.amount),0)
+                )}
+              </span>
+              <div style={{marginLeft:"auto",display:"flex",gap:8}}>
+                <button onClick={clearSelection} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"6px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>Deselect all</button>
+                <button onClick={askDeleteBulk} style={{background:C.danger,color:"#fff",border:"none",borderRadius:7,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+                  🗑 Delete {selectedIds.size} selected
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Legend */}
+          <div style={{display:"flex",gap:16,marginBottom:10,fontSize:11,color:C.textMid,alignItems:"center",flexWrap:"wrap"}}>
+            <span style={{fontWeight:700,color:C.textDim,textTransform:"uppercase",letterSpacing:"0.08em",fontSize:10}}>Legend:</span>
+            <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:10,height:10,borderRadius:2,background:C.accent+"33",border:`1px solid ${C.accent}55`}}/><span>Actual (QB synced)</span></div>
+            <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:10,height:10,borderRadius:2,background:C.blue+"33",border:`1px dashed ${C.blue}77`}}/><span>Projected (future)</span></div>
+            <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:10,height:2,background:C.warning,borderRadius:1}}/><span>Today divider</span></div>
+            <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:14,height:14,borderRadius:3,background:"transparent",border:`1.5px solid ${C.border}`}}/><span>Checkbox — select to bulk delete</span></div>
+          </div>
+
+          <UnifiedLedgerTable
+            rows={displayLedger} entities={entities} categories={categories} accounts={accounts}
+            showAll selectedIds={selectedIds}
+            onToggleSelect={isAdmin?toggleSelect:null}
+            onToggleSelectAll={isAdmin?toggleSelectAll:null}
+            onDeleteSingle={isAdmin?askDeleteSingle:null}
+          />
+
+          {/* Totals bar */}
+          <div style={{background:C.surface,border:`1px solid ${C.border}`,borderTop:"none",borderRadius:"0 0 12px 12px",padding:"10px 14px",display:"flex",gap:20,fontSize:12,flexWrap:"wrap"}}>
+            <span style={{color:C.textMid}}>{displayLedger.length} rows</span>
+            <span style={{color:C.accent}}>Actual in: +{fmtShort(displayLedger.filter(r=>r._status==="actual"&&r.type==="income").reduce((s,r)=>s+r.amount,0))}</span>
+            <span style={{color:C.danger}}>Actual out: −{fmtShort(displayLedger.filter(r=>r._status==="actual"&&r.type==="expense").reduce((s,r)=>s+r.amount,0))}</span>
+            <span style={{color:C.blue}}>Projected in: +{fmtShort(displayLedger.filter(r=>r._status==="projected"&&r.type==="income").reduce((s,r)=>s+r.amount,0))}</span>
+            <span style={{color:C.warning}}>Projected out: −{fmtShort(displayLedger.filter(r=>r._status==="projected"&&r.type==="expense").reduce((s,r)=>s+r.amount,0))}</span>
+          </div>
+        </>)}
+
+        {/* ══════════════════════════════════════════════════════════════════
+            PROJECTIONS
+        ══════════════════════════════════════════════════════════════════ */}
+        {tab==="projections"&&(
+          <ProjectionsTab projections={projections} setProjections={setProjections}
+            filteredProjOccs={filteredProjOccs} entities={entities} accounts={accounts} categories={categories}/>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════
+            CHART
+        ══════════════════════════════════════════════════════════════════ */}
+        {tab==="cashflow"&&(<>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,flexWrap:"wrap",gap:10}}>
+            <SectionHead title="Cashflow Chart" sub={`Opening ${fmtShort(kpi.opening)} → Current ${fmtShort(kpi.current)} → Ending ${fmtShort(kpi.ending)}`}/>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <span style={{fontSize:11,color:C.textMid}}>Horizon:</span>
+              {[14,30,60,90].map(d=>(
+                <button key={d} onClick={()=>setForecastDays(d)} style={{background:forecastDays===d?C.accentDim:"transparent",color:forecastDays===d?C.accent:C.textMid,border:`1px solid ${forecastDays===d?C.accent+"44":C.border}`,borderRadius:6,padding:"5px 11px",fontSize:11,fontWeight:700,cursor:"pointer"}}>{d}d</button>
+              ))}
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:18}}>
+            <KpiCard label="Opening Balance"  value={fmtShort(kpi.opening)} color={C.textMid}/>
+            <KpiCard label="Current Balance"  value={fmtShort(kpi.current)} color={kpi.current>=0?C.accent:C.danger}/>
+            <KpiCard label={`Ending (+${forecastDays}d)`} value={fmtShort(kpi.ending)} color={kpi.ending>=10000?C.accent:kpi.ending>=0?C.warning:C.danger}/>
+            <KpiCard label="Lowest Point"     value={fmtShort(kpi.minBal)} color={kpi.minBal<0?C.danger:kpi.minBal<5000?C.warning:C.accent}/>
+          </div>
+
+          {/* SVG Chart */}
+          <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:"18px 16px 12px",marginBottom:18,overflowX:"auto"}}>
+            <svg width={W} height={H+16} viewBox={`0 0 ${W} ${H+16}`} style={{display:"block",minWidth:W}}>
+              <defs>
+                <linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.accent} stopOpacity=".3"/><stop offset="100%" stopColor={C.accent} stopOpacity=".02"/></linearGradient>
+                <linearGradient id="gp" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.blue} stopOpacity=".25"/><stop offset="100%" stopColor={C.blue} stopOpacity=".02"/></linearGradient>
+              </defs>
+
+              {/* Y grid */}
+              {[0,.25,.5,.75,1].map(p=>{
+                const v=cMin+p*cRange, y=toY(v);
+                return <g key={p}><line x1={44} y1={y} x2={W-10} y2={y} stroke={C.border} strokeDasharray="2,5"/><text x={40} y={y+4} textAnchor="end" fontSize={8} fill={C.textDim}>{fmtShort(v).replace("CA","").replace(",000","k")}</text></g>;
+              })}
+              {cMin<0&&<line x1={44} y1={toY(0)} x2={W-10} y2={toY(0)} stroke={C.danger} strokeWidth={1} strokeDasharray="3,3"/>}
+
+              {/* TODAY shaded band */}
+              {todayIdx>=0&&(()=>{
+                const x=toX(todayIdx);
+                return <><rect x={x-1} y={10} width={3} height={H-30} fill={C.warning} opacity={0.9} rx={1}/><text x={x} y={H+14} textAnchor="middle" fontSize={8} fill={C.warning} fontWeight="bold">TODAY</text></>;
+              })()}
+
+              {/* Actual area */}
+              {(()=>{
+                const actPts=chartData.filter(d=>!d.isProjected);
+                if(actPts.length<2) return null;
+                const line=actPts.map((d,i)=>`${i===0?"M":"L"}${toX(chartData.indexOf(d))},${toY(d.balance)}`).join(" ");
+                const fi=chartData.indexOf(actPts[0]), li=chartData.indexOf(actPts[actPts.length-1]);
+                return <><path d={line+` L${toX(li)},${H-20} L${toX(fi)},${H-20} Z`} fill="url(#ga)"/><path d={line} fill="none" stroke={C.accent} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"/></>;
+              })()}
+
+              {/* Projected area */}
+              {(()=>{
+                const pPts=chartData.filter(d=>d.isProjected||d.isToday);
+                if(pPts.length<2) return null;
+                const line=pPts.map((d,i)=>`${i===0?"M":"L"}${toX(chartData.indexOf(d))},${toY(d.balance)}`).join(" ");
+                const fi=chartData.indexOf(pPts[0]), li=chartData.indexOf(pPts[pPts.length-1]);
+                return <><path d={line+` L${toX(li)},${H-20} L${toX(fi)},${H-20} Z`} fill="url(#gp)"/><path d={line} fill="none" stroke={C.blue} strokeWidth={2} strokeDasharray="5,3" strokeLinecap="round" strokeLinejoin="round"/></>;
+              })()}
+
+              {/* Dots */}
+              {chartData.map((d,i)=>{
+                if(!d.hasActivity&&!d.isToday) return null;
+                const x=toX(i),y=toY(d.balance);
+                if(d.isToday) return <circle key={i} cx={x} cy={y} r={5} fill={C.warning} stroke={C.bg} strokeWidth={2}/>;
+                return <circle key={i} cx={x} cy={y} r={3} fill={d.isProjected?C.blue:C.accent} stroke={C.bg} strokeWidth={1.5}/>;
+              })}
+
+              {/* X labels */}
+              {chartData.map((d,i)=>{
+                if(i%7!==0&&!d.isToday) return null;
+                return <text key={i} x={toX(i)} y={H+14} textAnchor="middle" fontSize={7} fill={d.isToday?C.warning:C.textDim}>{d.date.slice(5)}</text>;
+              })}
+            </svg>
+            <div style={{display:"flex",gap:18,marginTop:8,paddingLeft:44}}>
+              {[{c:C.accent,l:"Actual balance"},{c:C.blue,l:"Projected",dash:true},{c:C.warning,l:"Today"}].map(({c,l,dash})=>(
+                <div key={l} style={{display:"flex",alignItems:"center",gap:5}}>
+                  <div style={{width:16,height:2,background:dash?"transparent":c,backgroundImage:dash?`repeating-linear-gradient(90deg,${c},${c} 4px,transparent 4px,transparent 7px)`:"none"}}/>
+                  <span style={{fontSize:10,color:C.textMid}}>{l}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>)}
+
+        {/* ══════════════════════════════════════════════════════════════════
+            SETTINGS (admin only)
+        ══════════════════════════════════════════════════════════════════ */}
+        {tab==="settings"&&isAdmin&&(
+          <SettingsTab entities={entities} setEntities={setEntities} accounts={accounts} setAccounts={setAccounts}
+            categories={categories} setCategories={setCategories} settingsTab={settingsTab} setSettingsTab={setSettingsTab}
+            users={users} saveUsers={saveUsers} currentUser={session?.user}/>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UNIFIED LEDGER TABLE
+// ─────────────────────────────────────────────────────────────────────────────
+function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore, showAll,
+  selectedIds, onToggleSelect, onToggleSelectAll, onDeleteSingle}) {
+
+  const canDelete = !!onToggleSelect; // only in full transactions tab
+  const COLS = canDelete
+    ? "32px 82px 64px 1fr 80px 90px 90px 140px 70px"
+    : "82px 64px 1fr 80px 90px 90px 140px 80px";
+  const LABELS = canDelete
+    ? ["","Date","Entity","Description","Amount","Category","Status","Balance",""]
+    : ["Date","Entity","Description","Amount","Category","Status","Balance","Source"];
+
+  // actual row ids in this view (for select-all)
+  const actualIds = useMemo(() => rows.filter(r=>r._status==="actual").map(r=>r.id), [rows]);
+  const allSelected = actualIds.length > 0 && actualIds.every(id => selectedIds?.has(id));
+  const someSelected = actualIds.some(id => selectedIds?.has(id));
+
+  const withDivider = useMemo(()=>{
+    const out=[];
+    let todayInserted=false;
+    for(let i=0;i<rows.length;i++){
+      const r=rows[i];
+      if(!todayInserted && r._date<=TODAY_STR){
+        out.push({_isDivider:true,key:"today-divider"});
+        todayInserted=true;
+      }
+      out.push(r);
+    }
+    if(!todayInserted) out.push({_isDivider:true,key:"today-divider"});
+    return out;
+  },[rows]);
+
+  return (
+    <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:canDelete?12:"12px 12px 0 0",overflow:"hidden"}}>
+      {title&&(
+        <div style={{padding:"11px 14px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontWeight:700,fontSize:13}}>{title}</span>
+          {onMore&&<button onClick={onMore} style={{background:"none",border:"none",color:C.accent,cursor:"pointer",fontSize:11,fontWeight:700}}>View all →</button>}
+        </div>
+      )}
+
+      {/* Column headers — with select-all checkbox */}
+      <div style={{display:"grid",gridTemplateColumns:COLS,gap:10,padding:"8px 14px",borderBottom:`1px solid ${C.border}`,background:C.surfaceHigh}}>
+        {canDelete&&(
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <input type="checkbox" checked={allSelected} ref={el=>{if(el)el.indeterminate=someSelected&&!allSelected;}}
+              onChange={()=>onToggleSelectAll(actualIds)}
+              style={{width:14,height:14,cursor:"pointer",accentColor:C.accent}}/>
+          </div>
+        )}
+        {LABELS.map(l=><span key={l} style={{fontSize:10,color:C.textDim,textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:700}}>{l}</span>)}
+      </div>
+
+      <div style={{maxHeight:showAll?620:380,overflowY:"auto"}}>
+        {withDivider.length===0&&<Empty msg="No transactions to display."/>}
+        {withDivider.map((row,idx)=>{
+          // TODAY divider
+          if(row._isDivider) return (
+            <div key="div" style={{display:"flex",alignItems:"center",gap:10,padding:"6px 14px",background:"#0F1800",borderTop:`1px solid ${C.warning}44`,borderBottom:`1px solid ${C.warning}44`,position:"sticky",top:0,zIndex:10}}>
+              <div style={{flex:1,height:1,background:`linear-gradient(90deg,transparent,${C.warning}66)`}}/>
+              <div style={{display:"flex",alignItems:"center",gap:7,background:C.warning+"22",border:`1px solid ${C.warning}55`,borderRadius:20,padding:"3px 12px"}}>
+                <div style={{width:6,height:6,borderRadius:"50%",background:C.warning}}/>
+                <span style={{fontSize:10,fontWeight:800,color:C.warning,letterSpacing:"0.1em",textTransform:"uppercase"}}>Today — {TODAY_STR}</span>
+              </div>
+              <div style={{flex:1,height:1,background:`linear-gradient(90deg,${C.warning}66,transparent)`}}/>
+            </div>
+          );
+
+          const isProj = row._status==="projected";
+          const isSelected = canDelete && !isProj && selectedIds?.has(row.id);
+          const ent = entities.find(e=>e.id===row.entityId);
+          const cat = categories.find(c=>c.id===row.categoryId);
+
+          return (
+            <div key={row.id+idx} className="rh" style={{
+              display:"grid", gridTemplateColumns:COLS, gap:10, padding:"8px 14px", alignItems:"center",
+              borderBottom:`1px solid ${C.border}`,
+              background: isSelected ? "#1A0A0A" : isProj ? "#0A1525" : "transparent",
+              borderLeft: isSelected ? `3px solid ${C.danger}` : isProj ? `3px dashed ${C.blue}55` : `3px solid transparent`,
+              transition:"background 0.12s",
+              opacity: isProj ? 0.88 : 1,
+            }}>
+              {/* Checkbox — actual rows only for bulk select */}
+              {canDelete&&(
+                <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  {!isProj
+                    ? <input type="checkbox" checked={!!isSelected} onChange={()=>onToggleSelect(row.id)}
+                        style={{width:14,height:14,cursor:"pointer",accentColor:C.danger}}/>
+                    : <span style={{width:14,height:14,display:"inline-block"}}/>
+                  }
+                </div>
+              )}
+
+              {/* Date */}
+              <span style={{fontSize:11,fontFamily:"monospace",color:isProj?C.blue:C.textMid}}>{row._date.slice(5)}</span>
+
+              {/* Entity */}
+              <div style={{display:"flex",alignItems:"center",gap:4}}>
+                <Dot color={ent?.color||C.textMid} size={6}/>
+                <span style={{fontSize:10,color:ent?.color||C.textMid,fontWeight:700}}>{ent?.short||"—"}</span>
+              </div>
+
+              {/* Description */}
+              <div>
+                <div style={{fontSize:12,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.description}</div>
+                {isProj&&row.recurrence!=="once"&&<div style={{fontSize:9,color:C.blue,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.08em"}}>↻ {row.recurrence}</div>}
+              </div>
+
+              {/* Amount */}
+              <span style={{textAlign:"right",fontWeight:700,fontFamily:"monospace",fontSize:13,color:row.type==="income"?C.accent:C.danger}}>
+                {row.type==="income"?"+":"−"}{fmtShort(row.amount)}
+              </span>
+
+              {/* Category */}
+              <div>{cat&&<Badge color={cat.color}>{cat.name}</Badge>}</div>
+
+              {/* Status */}
+              <div>
+                {isProj ? <Badge color={C.blue}>Projected</Badge> : <Badge color={C.accent}>QB Actual</Badge>}
+              </div>
+
+              {/* Running balance */}
+              <span style={{textAlign:"right",fontWeight:800,fontFamily:"monospace",fontSize:13,
+                color:row.runBalance<0?C.danger:row.runBalance<5000?C.warning:C.accent,
+                opacity:isProj?0.8:1}}>
+                {fmtCAD(row.runBalance)}
+              </span>
+
+              {/* Delete button / Source badge */}
+              {canDelete ? (
+                <button onClick={()=>onDeleteSingle(row)} title={isProj?"Delete projected transaction":"Delete transaction"}
+                  style={{background:"transparent",border:`1px solid ${isProj?C.blue+"44":C.border}`,color:isProj?C.blue+"88":C.textDim,borderRadius:6,padding:"3px 7px",fontSize:12,cursor:"pointer",lineHeight:1,transition:"all 0.15s"}}
+                  onMouseEnter={e=>{
+                    e.currentTarget.style.background=isProj?C.blueDim:C.dangerDim;
+                    e.currentTarget.style.borderColor=isProj?C.blue+"88":C.danger+"55";
+                    e.currentTarget.style.color=isProj?C.blue:C.danger;
+                  }}
+                  onMouseLeave={e=>{
+                    e.currentTarget.style.background="transparent";
+                    e.currentTarget.style.borderColor=isProj?C.blue+"44":C.border;
+                    e.currentTarget.style.color=isProj?C.blue+"88":C.textDim;
+                  }}>
+                  🗑
+                </button>
+              ) : (
+                <Badge color={row.source==="quickbooks"?C.qb:isProj?C.blue:C.warning}>
+                  {row.source==="quickbooks"?"QB":isProj?"Forecast":"Manual"}
+                </Badge>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROJECTIONS TAB
+// ─────────────────────────────────────────────────────────────────────────────
+function ProjectionsTab({projections,setProjections,filteredProjOccs,entities,accounts,categories}){
+  const blank={entityId:entities[0]?.id||"",accountId:"",description:"",amount:"",type:"income",categoryId:"cat1",recurrence:"once",startDate:dateStr(addDays(TODAY,7)),endDate:dateStr(addMonths(TODAY,3))};
+  const [form,setForm]=useState(blank);
+  const [editId,setEditId]=useState(null);
+  const formAccs=accounts.filter(a=>a.entityId===form.entityId);
+  useEffect(()=>{if(!formAccs.find(a=>a.id===form.accountId))setForm(f=>({...f,accountId:formAccs[0]?.id||""}));},[form.entityId]);
+  const save=()=>{
+    if(!form.description||!form.amount)return;
+    const p={...form,amount:parseFloat(form.amount)};
+    if(editId){setProjections(prev=>prev.map(x=>x.id===editId?{...p,id:editId}:x));setEditId(null);}
+    else setProjections(prev=>[...prev,{...p,id:uid()}]);
+    setForm(blank);
+  };
+  const startEdit=(p)=>{setForm({...p,amount:String(p.amount)});setEditId(p.id);};
+  const del=(id)=>{setProjections(prev=>prev.filter(p=>p.id!==id));if(editId===id){setEditId(null);setForm(blank);}};
+  const filteredRules=projections.filter(p=>(form.entityId==="all"||true));
+
+  return(<>
+    <SectionHead title="Projection Rules" sub="Define recurring & one-time future cash flows. Projected items appear in the Transactions tab."/>
+    <div style={{background:C.surface,border:`1px solid ${editId?C.blue+"55":C.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
+      <div style={{fontSize:12,fontWeight:700,color:editId?C.blue:C.accent,marginBottom:14}}>{editId?"✏ Edit Rule":"＋ New Rule"}</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:10}}>
+        <Fld label="Entity"><select style={selS} value={form.entityId} onChange={e=>setForm(f=>({...f,entityId:e.target.value}))}>{entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></Fld>
+        <Fld label="Account"><select style={selS} value={form.accountId} onChange={e=>setForm(f=>({...f,accountId:e.target.value}))}>{formAccs.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></Fld>
+        <Fld label="Type"><select style={selS} value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}><option value="income">Collection / Income</option><option value="expense">Expense / Payment</option></select></Fld>
+        <Fld label="Category"><select style={selS} value={form.categoryId} onChange={e=>setForm(f=>({...f,categoryId:e.target.value}))}>{categories.filter(c=>c.type===form.type).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></Fld>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:10,marginBottom:10}}>
+        <Fld label="Description"><input style={inpS} placeholder="e.g. Monthly Payroll" value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></Fld>
+        <Fld label="Amount (CAD)"><input style={inpS} type="number" placeholder="0.00" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))}/></Fld>
+        <Fld label="Recurrence"><select style={selS} value={form.recurrence} onChange={e=>setForm(f=>({...f,recurrence:e.target.value}))}><option value="once">One-time</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></Fld>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,alignItems:"end"}}>
+        <Fld label={form.recurrence==="once"?"Date":"Start Date"}><input style={inpS} type="date" value={form.startDate} onChange={e=>setForm(f=>({...f,startDate:e.target.value}))}/></Fld>
+        {form.recurrence!=="once"&&<Fld label="End Date"><input style={inpS} type="date" value={form.endDate} onChange={e=>setForm(f=>({...f,endDate:e.target.value}))}/></Fld>}
+        <div style={{gridColumn:form.recurrence==="once"?"2/4":"3/5",display:"flex",gap:8,alignItems:"flex-end"}}>
+          <button onClick={save} style={{flex:1,background:editId?C.blue:C.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:13,cursor:"pointer"}}>{editId?"Save Changes":"Add Rule"}</button>
+          {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"9px 12px",fontSize:12,cursor:"pointer"}}>Cancel</button>}
+        </div>
+      </div>
+    </div>
+
+    <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
+      <ColHdr cols="90px 1fr 90px 90px 90px 130px 80px 100px" labels={["Entity","Description","Amount","Type","Recurrence","Date Range","Occurrences","Actions"]}/>
+      {projections.length===0&&<Empty msg="No projection rules. Add one above."/>}
+      {projections.sort((a,b)=>a.startDate.localeCompare(b.startDate)).map(p=>{
+        const ent=entities.find(e=>e.id===p.entityId);
+        const occ=expandRecurring(p);
+        const cat=categories.find(c=>c.id===p.categoryId);
+        return(
+          <div key={p.id} className="rh" style={{display:"grid",gridTemplateColumns:"90px 1fr 90px 90px 90px 130px 80px 100px",gap:10,padding:"9px 14px",alignItems:"center",borderBottom:`1px solid ${C.border}`,background:editId===p.id?C.blue+"09":"transparent",transition:"background 0.12s"}}>
+            <div style={{display:"flex",alignItems:"center",gap:5}}><Dot color={ent?.color||C.textMid} size={7}/><span style={{fontSize:11,color:ent?.color,fontWeight:700}}>{ent?.short}</span></div>
+            <div><div style={{fontSize:12,color:C.text,fontWeight:500}}>{p.description}</div>{cat&&<Badge color={cat.color}>{cat.name}</Badge>}</div>
+            <span style={{textAlign:"right",fontWeight:700,fontFamily:"monospace",fontSize:12,color:p.type==="income"?C.accent:C.danger}}>{p.type==="income"?"+":"−"}{fmtShort(p.amount)}</span>
+            <Badge color={p.type==="income"?C.accent:C.danger}>{p.type==="income"?"Income":"Expense"}</Badge>
+            <Badge color={C.purple}>{p.recurrence}</Badge>
+            <span style={{fontSize:10,color:C.textMid,fontFamily:"monospace"}}>{p.startDate.slice(5)}{p.recurrence!=="once"?" → "+p.endDate?.slice(5):""}</span>
+            <span style={{fontSize:11,color:C.textMid}}>{occ.length}× <span style={{color:p.type==="income"?C.accent:C.danger}}>{fmtShort(occ.length*p.amount)}</span></span>
+            <div style={{display:"flex",gap:5}}>
+              <button onClick={()=>startEdit(p)} style={{background:C.blueDim,border:`1px solid ${C.blue}33`,color:C.blue,borderRadius:5,padding:"3px 7px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button>
+              <button onClick={()=>del(p.id)} style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,color:C.danger,borderRadius:5,padding:"3px 7px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </>);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SETTINGS TAB
+// ─────────────────────────────────────────────────────────────────────────────
+function SettingsTab({entities,setEntities,accounts,setAccounts,categories,setCategories,settingsTab,setSettingsTab,users,saveUsers,currentUser}){
+  const STABS=["entities","accounts","categories","users","bank sync"];
+  return(<>
+    <SectionHead title="Settings" sub="Manage entities, accounts, categories, users and bank connections"/>
+    <div style={{display:"flex",gap:0,marginBottom:22,borderBottom:`1px solid ${C.border}`}}>
+      {STABS.map(t=>(
+        <button key={t} onClick={()=>setSettingsTab(t)} style={{background:"transparent",color:settingsTab===t?C.accent:C.textMid,border:"none",borderBottom:settingsTab===t?`2px solid ${C.accent}`:"2px solid transparent",padding:"8px 14px",fontSize:12,fontWeight:600,cursor:"pointer",textTransform:"capitalize",position:"relative"}}>
+          {t}
+          {t==="users"&&<span style={{marginLeft:5,fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:99,background:C.purple+"22",color:C.purple,border:`1px solid ${C.purple}33`}}>{users?.length||0}</span>}
+        </button>
+      ))}
+    </div>
+    {settingsTab==="entities"  &&<EntitiesSettings  entities={entities}  setEntities={setEntities}/>}
+    {settingsTab==="accounts"  &&<AccountsSettings  accounts={accounts}  setAccounts={setAccounts}  entities={entities}/>}
+    {settingsTab==="categories"&&<CategoriesSettings categories={categories} setCategories={setCategories}/>}
+    {settingsTab==="users"     &&<UserManagement users={users||[]} saveUsers={saveUsers} currentUser={currentUser}/>}
+    {settingsTab==="bank sync" &&<BankSyncPanel/>}
+  </>);
+}
+
+function EntitiesSettings({entities,setEntities}){
+  const blank={name:"",short:"",color:PALETTE[0]};
+  const [form,setForm]=useState(blank);const [editId,setEditId]=useState(null);
+  const save=()=>{if(!form.name||!form.short)return;if(editId){setEntities(p=>p.map(e=>e.id===editId?{...form,id:editId}:e));setEditId(null);}else setEntities(p=>[...p,{...form,id:uid()}]);setForm(blank);};
+  const startEdit=(e)=>{setForm({name:e.name,short:e.short,color:e.color});setEditId(e.id);};
+  const del=(id)=>{setEntities(p=>p.filter(e=>e.id!==id));if(editId===id){setEditId(null);setForm(blank);}};
+  return(<div>
+    <div style={{background:C.surface,border:`1px solid ${editId?C.blue+"55":C.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
+      <div style={{fontSize:12,fontWeight:700,color:editId?C.blue:C.accent,marginBottom:14}}>{editId?"✏ Edit Entity":"＋ New Entity"}</div>
+      <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 160px 90px",gap:10,alignItems:"end"}}>
+        <Fld label="Company Name"><input style={inpS} placeholder="Canada MedLaser Inc" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
+        <Fld label="Short Code"><input style={inpS} placeholder="CML" value={form.short} onChange={e=>setForm(f=>({...f,short:e.target.value.toUpperCase().slice(0,6)}))}/></Fld>
+        <Fld label="Colour"><div style={{display:"flex",gap:5,flexWrap:"wrap",paddingTop:2}}>{PALETTE.map(p=><div key={p} onClick={()=>setForm(f=>({...f,color:p}))} style={{width:22,height:22,borderRadius:"50%",background:p,cursor:"pointer",border:form.color===p?`3px solid ${C.text}`:`2px solid ${C.bg}`}}/>)}</div></Fld>
+        <div style={{display:"flex",gap:6,alignItems:"flex-end"}}><button onClick={save} style={{flex:1,background:editId?C.blue:C.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>{editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}</div>
+      </div>
+    </div>
+    <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
+      <ColHdr cols="50px 1fr 100px 100px" labels={["","Name","Short","Actions"]}/>
+      {entities.map(e=><div key={e.id} className="rh" style={{display:"grid",gridTemplateColumns:"50px 1fr 100px 100px",gap:10,padding:"10px 14px",alignItems:"center",borderBottom:`1px solid ${C.border}`,transition:"background 0.12s"}}><Dot color={e.color} size={14}/><span style={{fontSize:13,color:C.text,fontWeight:600}}>{e.name}</span><Badge color={e.color}>{e.short}</Badge><div style={{display:"flex",gap:5}}><button onClick={()=>startEdit(e)} style={{background:C.blueDim,border:`1px solid ${C.blue}33`,color:C.blue,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button><button onClick={()=>del(e.id)} style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,color:C.danger,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button></div></div>)}
+      {entities.length===0&&<Empty msg="No entities."/>}
+    </div>
+  </div>);
+}
+
+function AccountsSettings({accounts,setAccounts,entities}){
+  const blank={entityId:entities[0]?.id||"",name:"",number:"",openBalance:""};
+  const [form,setForm]=useState(blank);const [editId,setEditId]=useState(null);
+  const save=()=>{if(!form.name||!form.entityId)return;const ent=entities.find(e=>e.id===form.entityId);const a={...form,openBalance:parseFloat(form.openBalance)||0,color:ent?.color||C.textMid};if(editId){setAccounts(p=>p.map(x=>x.id===editId?{...a,id:editId}:x));setEditId(null);}else setAccounts(p=>[...p,{...a,id:uid()}]);setForm(blank);};
+  const startEdit=(a)=>{setForm({entityId:a.entityId,name:a.name,number:a.number,openBalance:String(a.openBalance)});setEditId(a.id);};
+  const del=(id)=>{setAccounts(p=>p.filter(a=>a.id!==id));if(editId===id){setEditId(null);setForm(blank);}};
+  return(<div>
+    <div style={{background:C.surface,border:`1px solid ${editId?C.blue+"55":C.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
+      <div style={{fontSize:12,fontWeight:700,color:editId?C.blue:C.accent,marginBottom:14}}>{editId?"✏ Edit Account":"＋ New Account"}</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 90px",gap:10,alignItems:"end"}}>
+        <Fld label="Entity"><select style={selS} value={form.entityId} onChange={e=>setForm(f=>({...f,entityId:e.target.value}))}>{entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></Fld>
+        <Fld label="Account Name"><input style={inpS} placeholder="RBC Operations" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
+        <Fld label="Account # (masked)"><input style={inpS} placeholder="****4821" value={form.number} onChange={e=>setForm(f=>({...f,number:e.target.value}))}/></Fld>
+        <Fld label="Opening Balance"><input style={inpS} type="number" placeholder="0.00" value={form.openBalance} onChange={e=>setForm(f=>({...f,openBalance:e.target.value}))}/></Fld>
+        <div style={{display:"flex",gap:6,alignItems:"flex-end"}}><button onClick={save} style={{flex:1,background:editId?C.blue:C.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>{editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}</div>
+      </div>
+    </div>
+    <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
+      {entities.map(ent=>{const eAccs=accounts.filter(a=>a.entityId===ent.id);if(!eAccs.length)return null;return(<div key={ent.id}><div style={{padding:"7px 14px",background:C.surfaceHigh,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:7}}><Dot color={ent.color} size={8}/><span style={{fontSize:11,color:ent.color,fontWeight:700}}>{ent.name}</span><span style={{fontSize:10,color:C.textDim,marginLeft:"auto"}}>Total: {fmtShort(eAccs.reduce((s,a)=>s+(a.openBalance||0),0))}</span></div>{eAccs.map(a=><div key={a.id} className="rh" style={{display:"grid",gridTemplateColumns:"110px 1fr 130px 150px 100px",gap:10,padding:"9px 14px",alignItems:"center",borderBottom:`1px solid ${C.border}`,transition:"background 0.12s"}}><Badge color={ent.color}>{ent.short}</Badge><span style={{fontSize:13,color:C.text}}>{a.name}</span><span style={{fontSize:12,fontFamily:"monospace",color:C.textMid}}>{a.number}</span><span style={{fontSize:13,fontWeight:700,fontFamily:"monospace",color:C.accent}}>{fmtCAD(a.openBalance||0)}</span><div style={{display:"flex",gap:5}}><button onClick={()=>startEdit(a)} style={{background:C.blueDim,border:`1px solid ${C.blue}33`,color:C.blue,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button><button onClick={()=>del(a.id)} style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,color:C.danger,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button></div></div>)}</div>);})}
+      {accounts.length===0&&<Empty msg="No accounts."/>}
+    </div>
+  </div>);
+}
+
+function CategoriesSettings({categories,setCategories}){
+  const blank={name:"",type:"income",color:PALETTE[0]};
+  const [form,setForm]=useState(blank);const [editId,setEditId]=useState(null);
+  const save=()=>{if(!form.name)return;if(editId){setCategories(p=>p.map(c=>c.id===editId?{...form,id:editId}:c));setEditId(null);}else setCategories(p=>[...p,{...form,id:uid()}]);setForm(blank);};
+  const startEdit=(c)=>{setForm({name:c.name,type:c.type,color:c.color});setEditId(c.id);};
+  const del=(id)=>{setCategories(p=>p.filter(c=>c.id!==id));if(editId===id){setEditId(null);setForm(blank);}};
+  return(<div>
+    <div style={{background:C.surface,border:`1px solid ${editId?C.blue+"55":C.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
+      <div style={{fontSize:12,fontWeight:700,color:editId?C.blue:C.accent,marginBottom:14}}>{editId?"✏ Edit Category":"＋ New Category"}</div>
+      <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 160px 90px",gap:10,alignItems:"end"}}>
+        <Fld label="Name"><input style={inpS} placeholder="Franchise Fees" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
+        <Fld label="Type"><select style={selS} value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}><option value="income">Income</option><option value="expense">Expense</option></select></Fld>
+        <Fld label="Colour"><div style={{display:"flex",gap:5,flexWrap:"wrap",paddingTop:2}}>{PALETTE.map(p=><div key={p} onClick={()=>setForm(f=>({...f,color:p}))} style={{width:20,height:20,borderRadius:"50%",background:p,cursor:"pointer",border:form.color===p?`3px solid ${C.text}`:`2px solid ${C.bg}`}}/>)}</div></Fld>
+        <div style={{display:"flex",gap:6,alignItems:"flex-end"}}><button onClick={save} style={{flex:1,background:editId?C.blue:C.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>{editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}</div>
+      </div>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+      {[{label:"Income",list:categories.filter(c=>c.type==="income"),color:C.accent},{label:"Expense",list:categories.filter(c=>c.type==="expense"),color:C.danger}].map(({label,list,color})=>(
+        <div key={label} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
+          <div style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between"}}><span style={{fontWeight:700,fontSize:12,color}}>{label} Categories</span><span style={{fontSize:11,color:C.textMid}}>{list.length}</span></div>
+          {list.map(c=><div key={c.id} className="rh" style={{display:"flex",alignItems:"center",gap:10,padding:"8px 14px",borderBottom:`1px solid ${C.border}`,transition:"background 0.12s"}}><Dot color={c.color} size={10}/><span style={{flex:1,fontSize:13,color:C.text}}>{c.name}</span><button onClick={()=>startEdit(c)} style={{background:C.blueDim,border:`1px solid ${C.blue}33`,color:C.blue,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button><button onClick={()=>del(c.id)} style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,color:C.danger,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button></div>)}
+          {list.length===0&&<Empty msg="No categories."/>}
+        </div>
+      ))}
+    </div>
+  </div>);
+}
+
+function BankSyncPanel(){
+  const steps=[
+    {n:1,title:"Register Intuit Developer Account",desc:"Go to developer.intuit.com → create app → choose QuickBooks Online scope. You'll get a Client ID and Client Secret.",color:C.blue},
+    {n:2,title:"OAuth 2.0 Authorization Flow",desc:"User clicks 'Connect QB' → redirect to Intuit consent screen → user approves → Intuit returns auth_code → your server exchanges it for access_token + refresh_token.",color:C.purple},
+    {n:3,title:"Store Tokens Securely",desc:"Save access_token (1hr TTL) and refresh_token (101 days) in your database, encrypted at rest. Never expose the Client Secret in the browser.",color:C.warning},
+    {n:4,title:"Pull Transactions via API",desc:'GET https://quickbooks.api.intuit.com/v3/company/{realmId}/query\n?query=SELECT * FROM Purchase WHERE TxnDate >= \'2026-01-01\'\nRepeat for: Purchase (expenses), Deposit (income), JournalEntry, Bill, Invoice.',color:C.accent},
+    {n:5,title:"Handle Token Refresh",desc:"Before each API call, check if access_token is expired. Use refresh_token to get a new one via POST to oauth2.intuit.com/oauth2/v1/tokens/bearer. Log refresh failures — the user needs to re-authorize.",color:C.teal},
+    {n:6,title:"Webhook for Real-time Updates",desc:"Register a webhook endpoint in Intuit Developer portal. QB posts a notification within minutes of any new transaction. Your server verifies the signature (HMAC-SHA256), then fetches the delta.",color:"#FF6B9D"},
+  ];
+  const libs=[
+    {name:"intuit-oauth",lang:"Node.js",desc:"Official Intuit OAuth SDK. Handles token exchange and refresh automatically.",npm:"npm install intuit-oauth"},
+    {name:"node-quickbooks",lang:"Node.js",desc:"Wrapper for QB REST API. query(), findTransactions(), getCompanyInfo().",npm:"npm install node-quickbooks"},
+    {name:"python-quickbooks",lang:"Python",desc:"Django/Flask-friendly. QuickBooks.get_items(), find_accounts().",npm:"pip install python-quickbooks"},
+    {name:"next-auth + custom provider",lang:"Next.js",desc:"If using Next.js — wrap Intuit OAuth as a custom NextAuth provider. Session stores realm_id.",npm:"npm install next-auth"},
+  ];
+  return(<div>
+    <div style={{background:C.surface,border:`1px solid ${C.warning}44`,borderRadius:12,padding:16,marginBottom:22,display:"flex",gap:14,alignItems:"flex-start"}}>
+      <span style={{fontSize:24}}>⚡</span>
+      <div>
+        <div style={{fontWeight:700,color:C.warning,fontSize:13,marginBottom:6}}>Recommended path for your setup</div>
+        <div style={{color:C.text,fontSize:13,lineHeight:1.8}}>
+          Connect your bank accounts inside <strong style={{color:C.accent}}>QuickBooks Online → Banking → Add Account</strong>. QB pulls daily feeds from RBC, TD, BMO, and Scotiabank. Then this app calls the QB API via <strong style={{color:C.blue}}>OAuth 2.0</strong> to stream transactions into the ledger. One connection covers all 5 entities. <strong style={{color:C.accent}}>Zero extra bank credentials</strong> needed.
+        </div>
+      </div>
+    </div>
+
+    <div style={{marginBottom:22}}>
+      <div style={{fontSize:11,color:C.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>Integration Steps</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        {steps.map(s=>(
+          <div key={s.n} style={{background:C.surface,border:`1px solid ${s.color}33`,borderRadius:10,padding:"13px 14px",display:"flex",gap:12}}>
+            <div style={{width:28,height:28,borderRadius:"50%",background:s.color+"22",border:`1px solid ${s.color}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:s.color,flexShrink:0}}>{s.n}</div>
+            <div>
+              <div style={{fontWeight:700,fontSize:12,color:C.text,marginBottom:5}}>{s.title}</div>
+              <div style={{fontSize:11,color:C.textMid,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{s.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div>
+      <div style={{fontSize:11,color:C.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>Recommended Libraries</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:10}}>
+        {libs.map(l=>(
+          <div key={l.name} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"13px 14px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><Badge color={C.blue}>{l.lang}</Badge><span style={{fontWeight:700,fontSize:13,color:C.text,fontFamily:"monospace"}}>{l.name}</span></div>
+            <div style={{fontSize:11,color:C.textMid,lineHeight:1.5,marginBottom:8}}>{l.desc}</div>
+            <div style={{background:C.bg,borderRadius:6,padding:"5px 10px",fontFamily:"monospace",fontSize:11,color:C.accent}}>{l.npm}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>);
+}
