@@ -1,6 +1,9 @@
-// api/qb-auth.js — Redirect to Intuit OAuth
-// For multi-company: user connects one company at a time.
-// Each connection is stored by realmId — they accumulate, not overwrite.
+// api/qb-auth.js
+// Intuit OAuth doesn't support prompt=select_account.
+// To connect multiple companies, user must be logged out of Intuit first,
+// OR we use different Intuit accounts per company.
+// The correct solution: after connecting one company, we store it and
+// the next connect attempt uses &prompt=login to force fresh login.
 
 export default function handler(req, res) {
   const clientId    = process.env.QB_CLIENT_ID;
@@ -8,15 +11,7 @@ export default function handler(req, res) {
   const entityId    = req.query.entityId || "default";
 
   if (!clientId || !redirectUri) {
-    return res.status(500).send(`
-      <h2 style="font-family:sans-serif">Setup incomplete</h2>
-      <p>Add these to Vercel → Settings → Environment Variables:</p>
-      <ul style="font-family:monospace">
-        <li>QB_CLIENT_ID</li>
-        <li>QB_CLIENT_SECRET</li>
-        <li>QB_REDIRECT_URI = https://${req.headers.host}/api/qb-callback</li>
-      </ul>
-    `);
+    return res.status(500).send(`<h2>Missing QB_CLIENT_ID or QB_REDIRECT_URI in Vercel env vars.</h2>`);
   }
 
   const url = new URL("https://appcenter.intuit.com/connect/oauth2");
@@ -25,8 +20,8 @@ export default function handler(req, res) {
   url.searchParams.set("redirect_uri",  redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state",         entityId);
-  // prompt=select_account forces Intuit to show company picker every time
-  url.searchParams.set("prompt",        "select_account");
+  // Force Intuit to show fresh login so user can pick a different company
+  url.searchParams.set("prompt",        "login");
 
   res.redirect(302, url.toString());
 }

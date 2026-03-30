@@ -561,22 +561,26 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
   const [dateFrom,      setDateFrom]      = useState("");
   const [dateTo,        setDateTo]        = useState("");
   const [forecastDays,  setForecastDays]  = useState(30);
+  const [dateFrom,      setDateFrom]      = useState("");
+  const [dateTo,        setDateTo]        = useState("");
+  const [chartSubTab,   setChartSubTab]   = useState("line");
+  const [qbConnectMsg,  setQbConnectMsg]  = useState(null);
   const [syncing,       setSyncing]       = useState(false);
   const [syncMsg,       setSyncMsg]       = useState(null);
   const [chartSubTab,   setChartSubTab]   = useState("line"); // "line" | "monthly"
   const [qbConnectMsg,  setQbConnectMsg]  = useState(null);
 
-  // Detect QB OAuth callback redirect (?qb_connected=companyName)
+  // Detect QB OAuth callback redirect (?qb_connected=entityId)
   useEffect(()=>{
     try {
       const params = new URLSearchParams(window.location.search);
       const connected = params.get("qb_connected");
       const qbError   = params.get("qb_error");
       if (connected) {
-        setQbConnectMsg({ type:"success", msg:`✓ QuickBooks connected: "${decodeURIComponent(connected)}" — go to Settings → Bank Sync to assign it to an entity and sync.` });
+        setQbConnectMsg({ type:"success", msg:`✓ QuickBooks connected successfully! You can now sync transactions.` });
         window.history.replaceState({}, "", window.location.pathname);
         setTab("settings"); setSettingsTab("bank sync");
-        setTimeout(()=>setQbConnectMsg(null), 10000);
+        setTimeout(()=>setQbConnectMsg(null), 6000);
       } else if (qbError) {
         setQbConnectMsg({ type:"error", msg:`QB connection failed: ${qbError}` });
         window.history.replaceState({}, "", window.location.pathname);
@@ -731,7 +735,10 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
     try {
       const res  = await fetch("/api/qb-sync", {
         method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ sinceDate: dateStr(addDays(TODAY,-30)) }),
+        body: JSON.stringify({
+          sinceDate: dateStr(addDays(TODAY,-30)),
+          accounts: accounts.map(a=>({id:a.id, entityId:a.entityId, qbAccountId:a.qbAccountId||null})),
+        }),
       });
       if (!res.ok) throw new Error("API error "+res.status);
       const data = await res.json();
@@ -1227,11 +1234,9 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
 // MONTHLY CASHFLOW BY CATEGORY REPORT
 // ─────────────────────────────────────────────────────────────────────────────
 function MonthlyCategoryReport({ actualTxns, projections, categories, openingBalance }) {
-  const [reportType,  setReportType]  = useState("both");
-  const [reportFrom,  setReportFrom]  = useState(dateStr(addMonths(TODAY, -5)).slice(0,7));
-  const [reportTo,    setReportTo]    = useState(dateStr(addMonths(TODAY,  6)).slice(0,7));
-  const [hiddenCats,  setHiddenCats]  = useState(new Set()); // category IDs to exclude
-  const toggleCat = (id) => setHiddenCats(prev => { const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; });
+  const [reportType, setReportType] = useState("both");
+  const [reportFrom, setReportFrom] = useState(dateStr(addMonths(TODAY, -5)).slice(0,7));
+  const [reportTo,   setReportTo]   = useState(dateStr(addMonths(TODAY,  6)).slice(0,7));
 
   // Build month list between reportFrom and reportTo
   const monthList = useMemo(() => {
@@ -1282,9 +1287,9 @@ function MonthlyCategoryReport({ actualTxns, projections, categories, openingBal
         const total = Object.values(monthly).reduce((s,v)=>s+v, 0);
         return { cat, monthly, total };
       })
-      .filter(r => r.cat && !hiddenCats.has(r.cat.id))
+      .filter(r => r.cat)
       .sort((a,b) => Math.abs(b.total) - Math.abs(a.total));
-  }, [actualTxns, projOccs, categories, monthList, reportType, hiddenCats]);
+  }, [actualTxns, projOccs, categories, monthList, reportType]);
 
   // Monthly net + running balance
   const { monthlyNet, monthlyOpenBal, monthlyCloseBal } = useMemo(() => {
@@ -1312,62 +1317,28 @@ function MonthlyCategoryReport({ actualTxns, projections, categories, openingBal
 
   const maxAbs = Math.max(...data.flatMap(r => monthList.map(m => Math.abs(r.monthly[m.key]||0))), 1);
   const GCOLS = `180px repeat(${monthList.length}, 1fr) 110px`;
-  const incomeRows  = data.filter(r=>r.cat.type==="income");
-  const expenseRows = data.filter(r=>r.cat.type==="expense");
-  const allCats = categories.filter(c => reportType==="both"||c.type===reportType);
 
-  function Cell({val,bold}) {
-    const color = val===0?"#344558":val>0?"#00C896":"#FF4D4D";
+  const Cell = ({val, bold, dim}) => {
+    const color = val===0 ? "#344558" : val>0 ? "#00C896" : "#FF4D4D";
     return <div style={{padding:"8px 6px",textAlign:"right"}}>
-      <span style={{fontSize:11,fontFamily:"monospace",fontWeight:bold?800:600,color}}>{val===0?"—":(val>0?"+":"")+fmtShort(val)}</span>
+      <span style={{fontSize:11,fontFamily:"monospace",fontWeight:bold?800:600,color:dim?"#6B8299":color}}>
+        {val===0?"—":(val>0?"+":"")+fmtShort(val)}
+      </span>
     </div>;
-  }
-
-  function CatRows({rows,label,color}) {
-    if(!rows.length) return null;
-    return <>
-      <div style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,background:color+"11",borderBottom:`1px solid ${color}33`,minWidth:600}}>
-        <div style={{padding:"6px 14px",fontSize:10,color,fontWeight:800,textTransform:"uppercase",letterSpacing:"0.1em"}}>{label}</div>
-        {monthList.map(m=><div key={m.key}/>)}<div/>
-      </div>
-      {rows.map(({cat,monthly,total})=>(
-        <div key={cat.id} className="rh" style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,borderBottom:`1px solid ${COLORS.border}`,minWidth:600,transition:"background 0.12s"}}>
-          <div style={{padding:"9px 14px",display:"flex",alignItems:"center",gap:7}}>
-            <Dot color={cat.color} size={7}/>
-            <span style={{fontSize:12,color:COLORS.text,fontWeight:500}}>{cat.name}</span>
-          </div>
-          {monthList.map(m=>{
-            const val=monthly[m.key]||0;
-            const barW=val!==0?Math.max(3,Math.round((Math.abs(val)/maxAbs)*60)):0;
-            const isPos=val>=0;
-            const hasProj=projOccs.some(o=>o.occDate.slice(0,7)===m.key&&o.categoryId===cat.id);
-            return (
-              <div key={m.key} style={{padding:"9px 6px",textAlign:"right",position:"relative",borderLeft:hasProj?`2px dashed ${COLORS.blue}33`:"none"}}>
-                {barW>0&&<div style={{position:"absolute",bottom:4,right:6,height:3,width:barW,background:isPos?COLORS.accent+"55":COLORS.danger+"55",borderRadius:2}}/>}
-                <span style={{fontSize:11,fontFamily:"monospace",fontWeight:600,color:val===0?"#344558":isPos?COLORS.accent:COLORS.danger}}>
-                  {val===0?"—":(isPos?"+":"")+fmtShort(val)}
-                </span>
-              </div>
-            );
-          })}
-          <div style={{padding:"9px 14px",textAlign:"right"}}>
-            <span style={{fontSize:11,fontFamily:"monospace",fontWeight:800,color:total>=0?COLORS.accent:COLORS.danger}}>{total>=0?"+":""}{fmtShort(total)}</span>
-          </div>
-        </div>
-      ))}
-    </>;
-  }
+  };
 
   return (
     <div style={{animation:"fadein 0.25s ease"}}>
       {/* Controls */}
-      <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:14,flexWrap:"wrap"}}>
+      <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
         <span style={{fontSize:11,color:COLORS.textMid}}>From</span>
-        <input type="month" value={reportFrom} onChange={e=>setReportFrom(e.target.value)} style={{...inpS(),width:140,padding:"5px 9px",colorScheme:"dark"}}/>
+        <input type="month" value={reportFrom} onChange={e=>setReportFrom(e.target.value)}
+          style={{...inpS(),width:140,padding:"5px 9px",colorScheme:"dark"}}/>
         <span style={{fontSize:11,color:COLORS.textMid}}>To</span>
-        <input type="month" value={reportTo} onChange={e=>setReportTo(e.target.value)} style={{...inpS(),width:140,padding:"5px 9px",colorScheme:"dark"}}/>
+        <input type="month" value={reportTo} onChange={e=>setReportTo(e.target.value)}
+          style={{...inpS(),width:140,padding:"5px 9px",colorScheme:"dark"}}/>
         <div style={{width:1,background:COLORS.border,height:18}}/>
-        {[{k:"both",l:"All"},{k:"income",l:"Income"},{k:"expense",l:"Expense"}].map(({k,l})=>(
+        {[{k:"both",l:"Income & Expense"},{k:"income",l:"Income"},{k:"expense",l:"Expense"}].map(({k,l})=>(
           <button key={k} onClick={()=>setReportType(k)} style={{background:reportType===k?COLORS.accentDim:"transparent",color:reportType===k?COLORS.accent:COLORS.textMid,border:`1px solid ${reportType===k?COLORS.accent+"44":COLORS.border}`,borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>
         ))}
         <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8,fontSize:11,color:COLORS.textMid}}>
@@ -1376,35 +1347,21 @@ function MonthlyCategoryReport({ actualTxns, projections, categories, openingBal
         </div>
       </div>
 
-      {/* Category checkboxes */}
-      <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:10,padding:"10px 14px",marginBottom:14}}>
-        <div style={{fontSize:10,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.09em",marginBottom:8}}>Categories — uncheck to hide</div>
-        <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
-          {allCats.map(cat=>(
-            <label key={cat.id} style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",padding:"3px 8px",borderRadius:6,background:hiddenCats.has(cat.id)?"transparent":cat.color+"15",border:`1px solid ${hiddenCats.has(cat.id)?COLORS.border:cat.color+"44"}`,opacity:hiddenCats.has(cat.id)?0.4:1,transition:"all 0.15s"}}>
-              <input type="checkbox" checked={!hiddenCats.has(cat.id)} onChange={()=>toggleCat(cat.id)} style={{width:12,height:12,accentColor:cat.color,cursor:"pointer"}}/>
-              <Dot color={cat.color} size={6}/>
-              <span style={{fontSize:11,color:COLORS.text}}>{cat.name}</span>
-              <span style={{fontSize:9,color:cat.type==="income"?COLORS.accent:COLORS.danger,fontWeight:700}}>{cat.type==="income"?"▲":"▼"}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
       {/* Table */}
       <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,overflow:"auto"}}>
+        {/* Header */}
         <div style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,background:"#161E2A",borderBottom:`1px solid ${COLORS.border}`,minWidth:600}}>
           <div style={{padding:"8px 14px",fontSize:10,color:"#7A96B0",textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:600}}>Category</div>
           {monthList.map(m=>(
             <div key={m.key} style={{padding:"8px 6px",textAlign:"right"}}>
-              <div style={{fontSize:10,color:"#7A96B0",fontWeight:600}}>{m.label}</div>
+              <div style={{fontSize:10,color:"#7A96B0",fontWeight:600,letterSpacing:"0.06em"}}>{m.label}</div>
               <div style={{fontSize:8,color:m.isPast?COLORS.accent:COLORS.blue,fontWeight:700,textTransform:"uppercase",marginTop:1}}>{m.isPast?"Actual":"Forecast"}</div>
             </div>
           ))}
-          <div style={{padding:"8px 14px",fontSize:10,color:"#7A96B0",textTransform:"uppercase",fontWeight:600,textAlign:"right"}}>Total</div>
+          <div style={{padding:"8px 14px",fontSize:10,color:"#7A96B0",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600,textAlign:"right"}}>Total</div>
         </div>
 
-        {/* Opening balance */}
+        {/* Opening balance row */}
         <div style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,borderBottom:`1px solid ${COLORS.border}`,background:"#0E1828",minWidth:600}}>
           <div style={{padding:"7px 14px",fontSize:11,color:COLORS.textMid,fontWeight:700,fontStyle:"italic"}}>Opening Balance</div>
           {monthList.map(m=>(
@@ -1412,19 +1369,56 @@ function MonthlyCategoryReport({ actualTxns, projections, categories, openingBal
               <span style={{fontSize:11,fontFamily:"monospace",fontWeight:700,color:balColor(monthlyOpenBal[m.key]||0,0)}}>{fmtShort(monthlyOpenBal[m.key]||0)}</span>
             </div>
           ))}
-          <div/>
+          <div style={{padding:"7px 14px"}}/>
         </div>
 
         {data.length===0&&<Empty msg="No data for selected period."/>}
-        <CatRows rows={incomeRows} label="Income" color={COLORS.accent}/>
-        <CatRows rows={expenseRows} label="Expenses" color={COLORS.danger}/>
 
-        {data.length>0&&<>
+        {/* Category rows */}
+        {data.map(({cat,monthly,total})=>(
+          <div key={cat.id} className="rh" style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,borderBottom:`1px solid ${COLORS.border}`,minWidth:600,transition:"background 0.12s"}}>
+            <div style={{padding:"9px 14px",display:"flex",alignItems:"center",gap:7}}>
+              <Dot color={cat.color} size={7}/>
+              <span style={{fontSize:12,color:COLORS.text,fontWeight:500}}>{cat.name}</span>
+              <span style={{fontSize:9,color:cat.type==="income"?COLORS.accent:COLORS.danger,fontWeight:700}}>{cat.type==="income"?"▲":"▼"}</span>
+            </div>
+            {monthList.map(m=>{
+              const val = monthly[m.key]||0;
+              const barW = val!==0?Math.max(3,Math.round((Math.abs(val)/maxAbs)*60)):0;
+              const isPos=val>=0;
+              // Check if this cell has projected data
+              const hasProj = projOccs.some(o=>o.occDate.slice(0,7)===m.key&&o.categoryId===cat.id);
+              return (
+                <div key={m.key} style={{padding:"9px 6px",textAlign:"right",position:"relative",borderLeft:hasProj?`2px dashed ${COLORS.blue}33`:"none"}}>
+                  {barW>0&&<div style={{position:"absolute",bottom:4,right:6,height:3,width:barW,background:isPos?COLORS.accent+"55":COLORS.danger+"55",borderRadius:2}}/>}
+                  <span style={{fontSize:11,fontFamily:"monospace",fontWeight:600,color:val===0?"#344558":isPos?COLORS.accent:COLORS.danger}}>
+                    {val===0?"—":(isPos?"+":"")+fmtShort(val)}
+                  </span>
+                </div>
+              );
+            })}
+            <div style={{padding:"9px 14px",textAlign:"right"}}>
+              <span style={{fontSize:11,fontFamily:"monospace",fontWeight:800,color:total>=0?COLORS.accent:COLORS.danger}}>
+                {total>=0?"+":""}{fmtShort(total)}
+              </span>
+            </div>
+          </div>
+        ))}
+
+        {/* Net cash flow row */}
+        {data.length>0&&(
           <div style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,borderTop:`1px solid ${COLORS.borderMid}`,background:"#0E1828",minWidth:600}}>
             <div style={{padding:"9px 14px",fontSize:12,fontWeight:800,color:COLORS.text}}>Net Cash Flow</div>
-            {monthList.map(m=><Cell key={m.key} val={monthlyNet[m.key]||0} bold/>)}
+            {monthList.map(m=>{
+              const val=monthlyNet[m.key]||0;
+              return <Cell key={m.key} val={val} bold/>;
+            })}
             <Cell val={Object.values(monthlyNet).reduce((s,v)=>s+v,0)} bold/>
           </div>
+        )}
+
+        {/* Closing balance row */}
+        {data.length>0&&(
           <div style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,borderTop:`2px solid ${COLORS.border}`,background:"#0E1828",minWidth:600}}>
             <div style={{padding:"9px 14px",fontSize:12,fontWeight:800,color:COLORS.text,fontStyle:"italic"}}>Closing Balance</div>
             {monthList.map(m=>(
@@ -1432,9 +1426,9 @@ function MonthlyCategoryReport({ actualTxns, projections, categories, openingBal
                 <span style={{fontSize:12,fontFamily:"monospace",fontWeight:800,color:balColor(monthlyCloseBal[m.key]||0,0)}}>{fmtShort(monthlyCloseBal[m.key]||0)}</span>
               </div>
             ))}
-            <div/>
+            <div style={{padding:"9px 14px"}}/>
           </div>
-        </>}
+        )}
       </div>
 
       {/* Bar chart */}
@@ -1443,10 +1437,11 @@ function MonthlyCategoryReport({ actualTxns, projections, categories, openingBal
           <div style={{fontSize:11,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.09em",marginBottom:14}}>Monthly Net + Closing Balance</div>
           <div style={{display:"flex",gap:6,alignItems:"flex-end",height:90}}>
             {monthList.map(m=>{
-              const net=monthlyNet[m.key]||0,close=monthlyCloseBal[m.key]||0;
-              const maxNet=Math.max(...monthList.map(mm=>Math.abs(monthlyNet[mm.key]||0)),1);
-              const h=Math.max(4,Math.round((Math.abs(net)/maxNet)*70));
-              const isPos=net>=0;
+              const net  = monthlyNet[m.key]||0;
+              const close= monthlyCloseBal[m.key]||0;
+              const maxNet = Math.max(...monthList.map(mm=>Math.abs(monthlyNet[mm.key]||0)),1);
+              const h = Math.max(4,Math.round((Math.abs(net)/maxNet)*70));
+              const isPos = net>=0;
               return (
                 <div key={m.key} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
                   <div style={{fontSize:8,color:balColor(close,0),fontWeight:700,fontFamily:"monospace"}}>{fmtShort(close).replace("CA","").replace(",000","k")}</div>
@@ -1462,8 +1457,6 @@ function MonthlyCategoryReport({ actualTxns, projections, categories, openingBal
     </div>
   );
 }
-
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UNIFIED LEDGER TABLE
@@ -1744,8 +1737,22 @@ function EntitiesSettings({entities,setEntities}){
 }
 
 function AccountsSettings({accounts,setAccounts,entities}){
-  const blank={entityId:entities[0]?.id||"",name:"",number:"",openBalance:"",overdraft:""};
-  const [form,setForm]=useState(blank);const [editId,setEditId]=useState(null);
+  const blank={entityId:entities[0]?.id||"",name:"",number:"",openBalance:"",overdraft:"",qbAccountId:""};
+  const [form,    setForm]    = useState(blank);
+  const [editId,  setEditId]  = useState(null);
+  const [qbAccts, setQbAccts] = useState({}); // entityId → [{id,name,number,balance}]
+  const [loadingQB, setLoadingQB] = useState(false);
+
+  // Load QB accounts for all connected companies
+  useEffect(()=>{
+    setLoadingQB(true);
+    fetch("/api/qb-companies").then(r=>r.json()).then(d=>{
+      const map = {};
+      (d.companies||[]).forEach(c=>{ if(c.entityId && c.bankAccounts) map[c.entityId]=c.bankAccounts; });
+      setQbAccts(map);
+    }).catch(()=>{}).finally(()=>setLoadingQB(false));
+  },[]);
+
   const save=()=>{
     if(!form.name||!form.entityId)return;
     const ent=entities.find(e=>e.id===form.entityId);
@@ -1754,30 +1761,41 @@ function AccountsSettings({accounts,setAccounts,entities}){
     else setAccounts(p=>[...p,{...a,id:uid()}]);
     setForm(blank);
   };
-  const startEdit=(a)=>{setForm({entityId:a.entityId,name:a.name,number:a.number,openBalance:String(a.openBalance),overdraft:String(a.overdraft||0)});setEditId(a.id);};
+  const startEdit=(a)=>{setForm({entityId:a.entityId,name:a.name,number:a.number,openBalance:String(a.openBalance),overdraft:String(a.overdraft||0),qbAccountId:a.qbAccountId||""});setEditId(a.id);};
   const del=(id)=>{setAccounts(p=>p.filter(a=>a.id!==id));if(editId===id){setEditId(null);setForm(blank);}};
+
+  const availQBAccts = qbAccts[form.entityId] || [];
+
   return(<div>
     <div style={{background:COLORS.surface,border:`1px solid ${editId?COLORS.blue+"55":COLORS.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
       <div style={{fontSize:12,fontWeight:700,color:editId?COLORS.blue:COLORS.accent,marginBottom:14}}>{editId?"✏ Edit Account":"＋ New Account"}</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr 90px",gap:10,alignItems:"end"}}>
-        <Fld label="Entity"><select style={selS()} value={form.entityId} onChange={e=>setForm(f=>({...f,entityId:e.target.value}))}>{entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></Fld>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr 1fr 90px",gap:10,alignItems:"end"}}>
+        <Fld label="Entity"><select style={selS()} value={form.entityId} onChange={e=>setForm(f=>({...f,entityId:e.target.value,qbAccountId:""}))}>{entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></Fld>
         <Fld label="Account Name"><input style={inpS()} placeholder="RBC Operations" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
         <Fld label="Account # (masked)"><input style={inpS()} placeholder="****4821" value={form.number} onChange={e=>setForm(f=>({...f,number:e.target.value}))}/></Fld>
-        <Fld label="Opening Balance (CAD)"><input style={inpS()} type="number" placeholder="0.00" value={form.openBalance} onChange={e=>setForm(f=>({...f,openBalance:e.target.value}))}/></Fld>
-        <Fld label="Overdraft Limit (CAD)">
-          <div style={{position:"relative"}}>
-            <input style={{...inpS(),borderColor:form.overdraft&&parseFloat(form.overdraft)>0?COLORS.danger+"66":COLORS.border}} type="number" placeholder="0 = none" value={form.overdraft} onChange={e=>setForm(f=>({...f,overdraft:e.target.value}))}/>
-            {form.overdraft&&parseFloat(form.overdraft)>0&&<span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",fontSize:9,color:COLORS.danger,fontWeight:700,pointerEvents:"none"}}>−{fmtShort(parseFloat(form.overdraft))}</span>}
-          </div>
+        <Fld label="Opening Balance"><input style={inpS()} type="number" placeholder="0.00" value={form.openBalance} onChange={e=>setForm(f=>({...f,openBalance:e.target.value}))}/></Fld>
+        <Fld label="Overdraft Limit">
+          <input style={{...inpS(),borderColor:form.overdraft&&parseFloat(form.overdraft)>0?COLORS.danger+"66":COLORS.border}} type="number" placeholder="0 = none" value={form.overdraft} onChange={e=>setForm(f=>({...f,overdraft:e.target.value}))}/>
+        </Fld>
+        <Fld label={loadingQB?"QB Account (loading…)":"Link to QB Account"}>
+          <select style={{...selS(),borderColor:form.qbAccountId?COLORS.qb+"88":COLORS.border}} value={form.qbAccountId} onChange={e=>setForm(f=>({...f,qbAccountId:e.target.value}))}>
+            <option value="">— not linked —</option>
+            {availQBAccts.map(a=><option key={a.id} value={a.id}>{a.name}{a.number?` ****${a.number.slice(-4)}`:""}</option>)}
+            {availQBAccts.length===0&&!loadingQB&&<option disabled value="">Connect QB first in Bank Sync tab</option>}
+          </select>
         </Fld>
         <div style={{display:"flex",gap:6,alignItems:"flex-end"}}>
           <button onClick={save} style={{flex:1,background:editId?COLORS.blue:COLORS.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>
           {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:"#161E2A",color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}
         </div>
       </div>
-      {/* Overdraft explanation */}
-      <div style={{marginTop:12,padding:"8px 12px",background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}22`,borderRadius:7,fontSize:11,color:COLORS.textMid,lineHeight:1.5}}>
-        <span style={{color:COLORS.danger,fontWeight:700}}>Overdraft limit</span> — the maximum amount the bank allows you to go below zero. E.g. enter 5000 if your bank allows −$5,000. Balance turns <span style={{color:COLORS.danger,fontWeight:700}}>red</span> when it drops below this limit, <span style={{color:COLORS.warning,fontWeight:700}}>amber</span> when it dips negative but is within the limit.
+      <div style={{marginTop:12,display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <div style={{padding:"8px 12px",background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}22`,borderRadius:7,fontSize:11,color:COLORS.textMid,lineHeight:1.5}}>
+          <span style={{color:COLORS.danger,fontWeight:700}}>Overdraft limit</span> — the max the bank allows below zero. Balance turns red when exceeded, amber when negative but within limit.
+        </div>
+        <div style={{padding:"8px 12px",background:"#051510",border:`1px solid ${COLORS.qb}33`,borderRadius:7,fontSize:11,color:COLORS.textMid,lineHeight:1.5}}>
+          <span style={{color:COLORS.qb,fontWeight:700}}>Link to QB Account</span> — connects this account to a specific QuickBooks bank account. Only transactions from that QB account will sync here.
+        </div>
       </div>
     </div>
 
@@ -1786,38 +1804,52 @@ function AccountsSettings({accounts,setAccounts,entities}){
       {entities.map(ent=>{
         const eAccs=accounts.filter(a=>a.entityId===ent.id);
         if(!eAccs.length) return null;
+        const entQBAccts = qbAccts[ent.id]||[];
         return(
           <div key={ent.id}>
             <div style={{padding:"7px 14px",background:"#161E2A",borderBottom:`1px solid ${COLORS.border}`,display:"flex",alignItems:"center",gap:7}}>
               <Dot color={ent.color} size={8}/>
               <span style={{fontSize:11,color:ent.color,fontWeight:700}}>{ent.name}</span>
+              {entQBAccts.length>0&&<span style={{fontSize:10,color:COLORS.qb,background:COLORS.qb+"15",border:`1px solid ${COLORS.qb}33`,borderRadius:99,padding:"1px 7px",marginLeft:6}}>QB connected · {entQBAccts.length} accounts</span>}
               <span style={{fontSize:10,color:COLORS.textDim,marginLeft:"auto"}}>Total: {fmtShort(eAccs.reduce((s,a)=>s+(a.openBalance||0),0))}</span>
             </div>
-            {eAccs.map(a=>(
-              <div key={a.id} className="rh" style={{display:"grid",gridTemplateColumns:"100px 1fr 120px 130px 120px 100px",gap:10,padding:"9px 14px",alignItems:"center",borderBottom:`1px solid ${COLORS.border}`,transition:"background 0.12s"}}>
-                <Badge color={ent.color}>{ent.short}</Badge>
-                <span style={{fontSize:13,color:COLORS.text}}>{a.name}</span>
-                <span style={{fontSize:12,fontFamily:"monospace",color:COLORS.textMid}}>{a.number}</span>
-                <span style={{fontSize:13,fontWeight:700,fontFamily:"monospace",color:COLORS.accent}}>{fmtCAD(a.openBalance||0)}</span>
-                <div style={{display:"flex",alignItems:"center",gap:6}}>
-                  {(a.overdraft||0)>0
-                    ? <span style={{fontSize:12,fontFamily:"monospace",fontWeight:700,color:COLORS.danger}}>−{fmtShort(a.overdraft)}</span>
-                    : <span style={{fontSize:11,color:COLORS.textDim}}>No overdraft</span>
-                  }
+            {eAccs.map(a=>{
+              const linkedQB = entQBAccts.find(q=>q.id===a.qbAccountId);
+              return(
+                <div key={a.id} className="rh" style={{display:"grid",gridTemplateColumns:"90px 1fr 110px 120px 110px 1fr 90px",gap:10,padding:"9px 14px",alignItems:"center",borderBottom:`1px solid ${COLORS.border}`,transition:"background 0.12s"}}>
+                  <Badge color={ent.color}>{ent.short}</Badge>
+                  <span style={{fontSize:13,color:COLORS.text,fontWeight:500}}>{a.name}</span>
+                  <span style={{fontSize:12,fontFamily:"monospace",color:COLORS.textMid}}>{a.number}</span>
+                  <span style={{fontSize:13,fontWeight:700,fontFamily:"monospace",color:COLORS.accent}}>{fmtCAD(a.openBalance||0)}</span>
+                  <div>
+                    {(a.overdraft||0)>0
+                      ? <span style={{fontSize:12,fontFamily:"monospace",fontWeight:700,color:COLORS.danger}}>−{fmtShort(a.overdraft)}</span>
+                      : <span style={{fontSize:11,color:COLORS.textDim}}>No OD</span>}
+                  </div>
+                  {/* QB link status */}
+                  <div style={{display:"flex",alignItems:"center",gap:5}}>
+                    {linkedQB ? (
+                      <div style={{display:"flex",alignItems:"center",gap:5,background:COLORS.qb+"15",border:`1px solid ${COLORS.qb}33`,borderRadius:6,padding:"2px 8px"}}>
+                        <div style={{width:6,height:6,borderRadius:"50%",background:COLORS.qb}}/>
+                        <span style={{fontSize:11,color:COLORS.qb,fontWeight:600}}>{linkedQB.name}</span>
+                        <span style={{fontSize:10,color:COLORS.textMid,fontFamily:"monospace"}}>{fmtShort(linkedQB.balance)}</span>
+                      </div>
+                    ) : (
+                      <span style={{fontSize:11,color:COLORS.textDim}}>Not linked to QB</span>
+                    )}
+                  </div>
+                  <div style={{display:"flex",gap:5}}>
+                    <button onClick={()=>startEdit(a)} style={{background:COLORS.blueDim,border:`1px solid ${COLORS.blue}33`,color:COLORS.blue,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button>
+                    <button onClick={()=>del(a.id)} style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,color:COLORS.danger,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button>
+                  </div>
                 </div>
-                <div style={{display:"flex",gap:5}}>
-                  <button onClick={()=>startEdit(a)} style={{background:COLORS.blueDim,border:`1px solid ${COLORS.blue}33`,color:COLORS.blue,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button>
-                  <button onClick={()=>del(a.id)} style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,color:COLORS.danger,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         );
       })}
       {accounts.length===0&&<Empty msg="No accounts."/>}
     </div>
-    {/* Column header for accounts table */}
-    <style>{`.acc-hdr{display:grid;grid-template-columns:100px 1fr 120px 130px 120px 100px;gap:10px;padding:8px 14px;background:#161E2A;border-bottom:1px solid ${COLORS.border}}`}</style>
   </div>);
 }
 
@@ -1851,60 +1883,53 @@ function CategoriesSettings({categories,setCategories}){
 
 function BankSyncPanel({ entities }){
   const [connections, setConnections] = useState([]);
+  const [companies,   setCompanies]   = useState([]);
   const [lastSync,    setLastSync]    = useState(null);
   const [loading,     setLoading]     = useState(true);
   const [syncing,     setSyncing]     = useState(false);
   const [syncResult,  setSyncResult]  = useState(null);
-  const [assigning,   setAssigning]   = useState(null); // realmId being reassigned
+  const [assigning,   setAssigning]   = useState(null);
 
   const reload = () => {
     setLoading(true);
-    fetch("/api/qb-status")
-      .then(r=>r.json())
-      .then(d=>{ setConnections(d.connections||[]); setLastSync(d.lastSync); })
-      .catch(()=>setConnections([]))
-      .finally(()=>setLoading(false));
+    Promise.all([
+      fetch("/api/qb-status").then(r=>r.json()).catch(()=>({connections:[],lastSync:null})),
+      fetch("/api/qb-companies").then(r=>r.json()).catch(()=>({companies:[]})),
+    ]).then(([status,compData])=>{
+      setConnections(status.connections||[]);
+      setLastSync(status.lastSync);
+      setCompanies(compData.companies||[]);
+    }).finally(()=>setLoading(false));
   };
   useEffect(()=>{ reload(); },[]);
 
-  const connect = () => {
-    // Connect without a specific entity — user will assign after
-    window.location.href = `/api/qb-auth?entityId=unassigned`;
-  };
-
-  const connectFor = (entityId) => {
-    window.location.href = `/api/qb-auth?entityId=${entityId}`;
-  };
+  const connect    = ()          => { window.location.href=`/api/qb-auth?entityId=unassigned`; };
+  const connectFor = (entityId)  => { window.location.href=`/api/qb-auth?entityId=${entityId}`; };
 
   const reassign = async (realmId, newEntityId) => {
-    // Update the entityId mapping in KV
-    await fetch("/api/qb-assign", {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({realmId, entityId: newEntityId}),
-    }).catch(()=>{});
+    await fetch("/api/qb-assign",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({realmId,entityId:newEntityId})}).catch(()=>{});
     setConnections(prev=>prev.map(c=>c.realmId===realmId?{...c,entityId:newEntityId}:c));
+    setCompanies(prev=>prev.map(c=>c.realmId===realmId?{...c,entityId:newEntityId}:c));
     setAssigning(null);
   };
 
   const disconnect = async (realmId, entityId) => {
-    await fetch("/api/qb-disconnect", {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({realmId, entityId}),
-    });
+    await fetch("/api/qb-disconnect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({realmId,entityId})});
     setConnections(prev=>prev.filter(c=>c.realmId!==realmId));
+    setCompanies(prev=>prev.filter(c=>c.realmId!==realmId));
   };
 
   const syncNow = async () => {
     setSyncing(true); setSyncResult(null);
     try {
-      const r = await fetch("/api/qb-sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})});
-      const d = await r.json();
-      setSyncResult(d); setLastSync(d.syncedAt);
+      const r=await fetch("/api/qb-sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})});
+      const d=await r.json(); setSyncResult(d); setLastSync(d.syncedAt);
     } catch(e){ setSyncResult({error:e.message}); }
     setSyncing(false);
   };
 
-  const entsById = Object.fromEntries((entities||DEFAULT_ENTITIES).map(e=>[e.id,e]));
+  const entsById   = Object.fromEntries((entities||DEFAULT_ENTITIES).map(e=>[e.id,e]));
+  const compByRealm= Object.fromEntries(companies.map(c=>[c.realmId,c]));
 
   return(<div>
     {/* Header */}
@@ -1913,7 +1938,7 @@ function BankSyncPanel({ entities }){
       <div style={{flex:1}}>
         <div style={{fontWeight:700,color:COLORS.accent,fontSize:13,marginBottom:4}}>QuickBooks Integration</div>
         <div style={{color:COLORS.textMid,fontSize:12,lineHeight:1.7}}>
-          Click <strong style={{color:COLORS.text}}>Add QB Company</strong> for each of your QuickBooks company files. Intuit will show a company picker — select one company, approve, and it will appear below. Then assign it to the matching entity in your app. Repeat for each company.
+          Connect each QB company file separately. Click <strong style={{color:COLORS.text}}>+ Add QB Company</strong>, sign into Intuit, and select one company. After connecting, assign it to the matching entity. Repeat for each company.
         </div>
       </div>
       <div style={{display:"flex",gap:8,flexShrink:0}}>
@@ -1928,91 +1953,91 @@ function BankSyncPanel({ entities }){
       </div>
     </div>
 
+    {/* Multi-company instructions */}
+    <div style={{background:"#0A1525",border:`1px solid ${COLORS.blue}44`,borderRadius:10,padding:"12px 14px",marginBottom:16}}>
+      <div style={{fontWeight:700,color:COLORS.blue,fontSize:11,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.08em"}}>Connecting multiple QB companies</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,fontSize:11,color:COLORS.textMid,lineHeight:1.6}}>
+        <div><strong style={{color:COLORS.text}}>Step 1:</strong> Click "+ Add QB Company" → Intuit login page opens → sign in with your QB credentials → select your company → Approve</div>
+        <div><strong style={{color:COLORS.text}}>Step 2:</strong> You return here → the connected company appears below → click <strong style={{color:COLORS.text}}>Assign</strong> to link it to the right entity</div>
+        <div><strong style={{color:COLORS.text}}>Step 3:</strong> To connect a second company — <strong style={{color:COLORS.warning}}>sign out of Intuit first</strong> (visit quickbooks.intuit.com → sign out), then click "+ Add QB Company" again and sign in with the credentials for the next company</div>
+        <div><strong style={{color:COLORS.text}}>Bank accounts:</strong> Once connected, all bank accounts inside that QB company appear automatically — no manual selection needed. All transactions sync from all accounts in that company.</div>
+      </div>
+    </div>
+
     {/* Sync results */}
     {lastSync&&<div style={{background:COLORS.accentDim,border:`1px solid ${COLORS.accent}33`,borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12,color:COLORS.accent}}>
       ✓ Last sync: {new Date(lastSync).toLocaleString("en-CA")}{syncResult&&!syncResult.error?` — ${syncResult.totalCount} transactions pulled`:""}
     </div>}
     {syncResult?.error&&<div style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12,color:COLORS.danger}}>✗ {syncResult.error}</div>}
 
-    {/* How to connect — step guide */}
-    <div style={{background:"#0A1525",border:`1px solid ${COLORS.blue}33`,borderRadius:10,padding:"12px 14px",marginBottom:16}}>
-      <div style={{fontWeight:700,color:COLORS.blue,fontSize:11,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.08em"}}>How to connect multiple companies</div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
-        {["1. Click \"+ Add QB Company\"","2. Intuit shows company picker — select one company","3. Approve access — you return here","4. Assign the connected company to your entity below"].map((s,i)=>(
-          <div key={i} style={{background:COLORS.bg,borderRadius:7,padding:"8px 10px",display:"flex",gap:8}}>
-            <div style={{width:18,height:18,borderRadius:"50%",background:COLORS.blue+"22",border:`1px solid ${COLORS.blue}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:COLORS.blue,flexShrink:0}}>{i+1}</div>
-            <div style={{fontSize:11,color:COLORS.textMid,lineHeight:1.5}}>{s.slice(3)}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-
     {/* Connected companies */}
-    <div style={{fontSize:11,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>
-      Connected QB Companies ({connections.length})
-    </div>
-    {loading&&<div style={{color:COLORS.textMid,fontSize:12,padding:"16px 0"}}>Checking connections…</div>}
+    <div style={{fontSize:11,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>Connected QB Companies ({connections.length})</div>
+    {loading&&<div style={{color:COLORS.textMid,fontSize:12,padding:"16px 0"}}>Loading connections…</div>}
     {!loading&&connections.length===0&&(
-      <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:10,padding:"24px",textAlign:"center",color:COLORS.textMid,fontSize:13,marginBottom:16}}>
-        No QB companies connected yet. Click <strong style={{color:COLORS.accent}}>+ Add QB Company</strong> to start.
+      <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:10,padding:"28px",textAlign:"center",color:COLORS.textMid,fontSize:13,marginBottom:16}}>
+        No QB companies connected yet.<br/>
+        <span style={{color:COLORS.accent,fontWeight:700,cursor:"pointer"}} onClick={connect}>+ Click here to connect your first QB company</span>
       </div>
     )}
     {!loading&&connections.length>0&&(
       <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,overflow:"hidden",marginBottom:20}}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 160px 120px",gap:0,background:"#161E2A",borderBottom:`1px solid ${COLORS.border}`}}>
-          {["QB Company (realmId)","Assigned to Entity","Status","Actions"].map(l=>(
-            <div key={l} style={{padding:"8px 14px",fontSize:10,color:"#7A96B0",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600}}>{l}</div>
-          ))}
-        </div>
         {connections.map((conn,i)=>{
-          const ent = entsById[conn.entityId];
-          const isUnassigned = !ent || conn.entityId==="unassigned";
+          const ent=entsById[conn.entityId];
+          const comp=compByRealm[conn.realmId];
+          const isUnassigned=!ent||conn.entityId==="unassigned";
           return(
-            <div key={conn.realmId} style={{display:"grid",gridTemplateColumns:"1fr 1fr 160px 120px",gap:0,padding:"11px 14px",borderBottom:i<connections.length-1?`1px solid ${COLORS.border}`:"none",alignItems:"center"}}>
-              {/* QB Company info */}
-              <div>
-                <div style={{fontSize:13,color:COLORS.text,fontWeight:600}}>{conn.companyName||"Unknown Company"}</div>
-                <div style={{fontSize:10,color:COLORS.textMid,fontFamily:"monospace",marginTop:2}}>realmId: {conn.realmId}</div>
-              </div>
-              {/* Entity assignment */}
-              <div>
-                {assigning===conn.realmId ? (
-                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                    <select defaultValue={conn.entityId} onChange={e=>reassign(conn.realmId,e.target.value)}
-                      style={{...inpS(),padding:"4px 8px",fontSize:12,width:"auto"}}>
-                      <option value="unassigned">— select entity —</option>
-                      {(entities||DEFAULT_ENTITIES).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
-                    </select>
-                    <button onClick={()=>setAssigning(null)} style={{background:"none",border:"none",color:COLORS.textMid,cursor:"pointer",fontSize:11}}>✕</button>
-                  </div>
-                ) : (
+            <div key={conn.realmId} style={{borderBottom:i<connections.length-1?`1px solid ${COLORS.border}`:"none",padding:"14px 16px"}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
+                <div style={{width:10,height:10,borderRadius:"50%",background:conn.needsReauth?COLORS.warning:COLORS.accent,marginTop:4,flexShrink:0}}/>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,color:COLORS.text,fontWeight:700,marginBottom:2}}>{comp?.companyName||`QB Company`}</div>
+                  <div style={{fontSize:10,color:COLORS.textDim,fontFamily:"monospace",marginBottom:8}}>realmId: {conn.realmId}</div>
+                  {comp?.bankAccounts?.length>0&&(
+                    <div style={{marginBottom:10}}>
+                      <div style={{fontSize:10,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>Bank accounts in this QB company</div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                        {comp.bankAccounts.map(acct=>(
+                          <div key={acct.id} style={{background:COLORS.bg,border:`1px solid ${COLORS.border}`,borderRadius:6,padding:"4px 10px",fontSize:11}}>
+                            <span style={{color:COLORS.text,fontWeight:600}}>{acct.name}</span>
+                            {acct.number&&<span style={{color:COLORS.textMid}}> ****{acct.number.slice(-4)}</span>}
+                            <span style={{color:COLORS.accent,marginLeft:8,fontFamily:"monospace"}}>{fmtShort(acct.balance)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    {ent ? (
-                      <div style={{display:"flex",alignItems:"center",gap:6}}>
-                        <Dot color={ent.color} size={8}/>
-                        <span style={{fontSize:12,color:COLORS.text,fontWeight:600}}>{ent.name}</span>
+                    <span style={{fontSize:11,color:COLORS.textMid}}>Assigned to:</span>
+                    {assigning===conn.realmId ? (
+                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                        <select defaultValue={conn.entityId||""} onChange={e=>reassign(conn.realmId,e.target.value)}
+                          style={{...inpS(),padding:"4px 8px",fontSize:12,width:"auto"}}>
+                          <option value="">— select entity —</option>
+                          {(entities||DEFAULT_ENTITIES).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+                        </select>
+                        <button onClick={()=>setAssigning(null)} style={{background:"none",border:"none",color:COLORS.textMid,cursor:"pointer",fontSize:12}}>✕</button>
                       </div>
                     ) : (
-                      <span style={{fontSize:12,color:COLORS.warning}}>⚠ Not assigned</span>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        {ent ? (
+                          <div style={{display:"flex",alignItems:"center",gap:6,background:ent.color+"15",border:`1px solid ${ent.color}33`,borderRadius:6,padding:"3px 10px"}}>
+                            <Dot color={ent.color} size={7}/><span style={{fontSize:12,color:COLORS.text,fontWeight:600}}>{ent.name}</span>
+                          </div>
+                        ) : (
+                          <span style={{fontSize:12,color:COLORS.warning,fontWeight:700}}>⚠ Not assigned yet</span>
+                        )}
+                        <button onClick={()=>setAssigning(conn.realmId)} style={{background:COLORS.blueDim,border:`1px solid ${COLORS.blue}33`,color:COLORS.blue,borderRadius:5,padding:"3px 9px",fontSize:11,cursor:"pointer",fontWeight:700}}>
+                          {isUnassigned?"Assign →":"Change"}
+                        </button>
+                      </div>
                     )}
-                    <button onClick={()=>setAssigning(conn.realmId)} style={{background:COLORS.blueDim,border:`1px solid ${COLORS.blue}33`,color:COLORS.blue,borderRadius:5,padding:"2px 7px",fontSize:10,cursor:"pointer",fontWeight:700}}>
-                      {isUnassigned?"Assign":"Change"}
-                    </button>
                   </div>
-                )}
-              </div>
-              {/* Status */}
-              <div>
-                <Badge color={conn.needsReauth?COLORS.warning:COLORS.accent}>
-                  {conn.needsReauth?"Needs Reauth":"Connected"}
-                </Badge>
-              </div>
-              {/* Actions */}
-              <div style={{display:"flex",gap:6}}>
-                {conn.needsReauth&&(
-                  <button onClick={()=>connectFor(conn.entityId)} style={{background:COLORS.warningDim,border:`1px solid ${COLORS.warning}33`,color:COLORS.warning,borderRadius:6,padding:"4px 10px",fontSize:10,fontWeight:700,cursor:"pointer"}}>Reconnect</button>
-                )}
-                <button onClick={()=>disconnect(conn.realmId,conn.entityId)} style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,color:COLORS.danger,borderRadius:6,padding:"4px 10px",fontSize:10,fontWeight:700,cursor:"pointer"}}>Remove</button>
+                </div>
+                <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                  <Badge color={conn.needsReauth?COLORS.warning:COLORS.accent}>{conn.needsReauth?"Expired":"Active"}</Badge>
+                  {conn.needsReauth&&<button onClick={()=>connectFor(conn.entityId)} style={{background:COLORS.warningDim,border:`1px solid ${COLORS.warning}33`,color:COLORS.warning,borderRadius:6,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>Reconnect</button>}
+                  <button onClick={()=>disconnect(conn.realmId,conn.entityId)} style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,color:COLORS.danger,borderRadius:6,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>Remove</button>
+                </div>
               </div>
             </div>
           );
@@ -2020,26 +2045,27 @@ function BankSyncPanel({ entities }){
       </div>
     )}
 
-    {/* Entity status summary */}
-    <div style={{fontSize:11,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>Entity Connection Status</div>
+    {/* Entity status */}
+    <div style={{fontSize:11,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>Entity Sync Status</div>
     <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,overflow:"hidden"}}>
       {(entities||DEFAULT_ENTITIES).map((ent,i)=>{
-        const conn = connections.find(c=>c.entityId===ent.id&&!c.needsReauth);
-        const hasConn = !!conn;
+        const conn=connections.find(c=>c.entityId===ent.id&&!c.needsReauth);
+        const comp=conn?compByRealm[conn.realmId]:null;
         return(
           <div key={ent.id} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",borderBottom:i<(entities||DEFAULT_ENTITIES).length-1?`1px solid ${COLORS.border}`:"none"}}>
-            <div style={{width:10,height:10,borderRadius:"50%",background:hasConn?COLORS.accent:COLORS.textDim,flexShrink:0}}/>
+            <div style={{width:10,height:10,borderRadius:"50%",background:conn?COLORS.accent:COLORS.textDim,flexShrink:0}}/>
             <Dot color={ent.color} size={9}/>
             <div style={{flex:1}}>
               <div style={{fontSize:13,color:COLORS.text,fontWeight:600}}>{ent.name}</div>
-              <div style={{fontSize:11,color:COLORS.textMid}}>{hasConn?`${conn.companyName||"QB Company"} connected`:"No QB company assigned — click Connect QB"}</div>
+              <div style={{fontSize:11,color:COLORS.textMid}}>
+                {conn?`${comp?.companyName||conn.realmId} · ${comp?.bankAccounts?.length||0} bank accounts`:"No QB company connected"}
+              </div>
             </div>
-            <Badge color={hasConn?COLORS.accent:COLORS.textDim}>{hasConn?"Syncing":"Not connected"}</Badge>
-            {!hasConn&&<button onClick={()=>connectFor(ent.id)} style={{background:COLORS.accentDim,border:`1px solid ${COLORS.accent}44`,color:COLORS.accent,borderRadius:7,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>Connect QB</button>}
+            <Badge color={conn?COLORS.accent:COLORS.textDim}>{conn?"Syncing":"Not connected"}</Badge>
+            {!conn&&<button onClick={()=>connectFor(ent.id)} style={{background:COLORS.accentDim,border:`1px solid ${COLORS.accent}44`,color:COLORS.accent,borderRadius:7,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>Connect QB</button>}
           </div>
         );
       })}
     </div>
   </div>);
 }
-
