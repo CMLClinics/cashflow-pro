@@ -215,7 +215,7 @@ export default function AuthGate() {
     </div>
   );
 
-  if (!session) return <LoginScreen users={users||DEFAULT_USERS} onLogin={login}/>;
+  if (!session) return <LoginScreen users={users||DEFAULT_USERS} onLogin={login} saveUsers={saveUsers}/>;
 
   return <CashFlowPro session={session} onLogout={logout} users={users||DEFAULT_USERS} saveUsers={saveUsers}/>;
 }
@@ -223,94 +223,202 @@ export default function AuthGate() {
 // ─────────────────────────────────────────────────────────────────────────────
 // LOGIN SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
-function LoginScreen({ users, onLogin }) {
+function LoginScreen({ users, onLogin, saveUsers }) {
+  const [view,     setView]     = useState("login");   // "login" | "forgot" | "sent"
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [showPw,   setShowPw]   = useState(false);
   const [error,    setError]    = useState("");
   const [loading,  setLoading]  = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+
+  const iS = {width:"100%",background:"#0A0E14",border:"1px solid #1E2D40",borderRadius:8,padding:"10px 13px",color:"#E8F0FC",fontSize:13,fontFamily:"inherit",transition:"border-color 0.15s",outline:"none"};
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError(""); setLoading(true);
-    await new Promise(r=>setTimeout(r,400)); // brief UX delay
+    await new Promise(r=>setTimeout(r,400));
     const user = users.find(u=>u.email.toLowerCase()===email.trim().toLowerCase());
     if (!user) { setError("No account found with that email."); setLoading(false); return; }
     const hash = await hashPw(password);
-    // First-time login: if user has no hash set, any password works and sets it
-    if (!user.hash || user.hash === "") {
-      onLogin({...user, hash});
+    // First-time: no password set yet — silently accept and save
+    if (!user.hash) {
+      const updated = users.map(u=>u.id===user.id?{...u,hash}:u);
+      saveUsers(updated);
+      onLogin({...user,hash});
       setLoading(false);
       return;
     }
-    if (hash !== user.hash) { setError("Incorrect password."); setLoading(false); return; }
+    if (hash !== user.hash) { setError("Incorrect password. Try again or use Forgot password."); setLoading(false); return; }
     onLogin(user);
     setLoading(false);
   };
+
+  // Forgot password — generates a reset token, stores it, emails user via mailto
+  const handleForgot = async (e) => {
+    e.preventDefault();
+    setError(""); setLoading(true);
+    await new Promise(r=>setTimeout(r,400));
+    const user = users.find(u=>u.email.toLowerCase()===resetEmail.trim().toLowerCase());
+    if (!user) { setError("No account found with that email."); setLoading(false); return; }
+    // Generate a 6-digit reset code valid for 30 minutes
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = Date.now() + 30 * 60 * 1000;
+    // Store reset code in localStorage
+    try { localStorage.setItem("cfp_reset_"+user.id, JSON.stringify({code, expiry})); } catch(e){}
+    // Open mailto — works without a mail server
+    const subject = encodeURIComponent("CashFlow Pro — Password Reset Code");
+    const body = encodeURIComponent(
+      `Your CashFlow Pro password reset code is:\n\n${code}\n\nThis code expires in 30 minutes.\n\nIf you did not request this, ignore this email.`
+    );
+    window.location.href = `mailto:${user.email}?subject=${subject}&body=${body}`;
+    setLoading(false);
+    setView("reset");
+  };
+
+  const [resetCode, setResetCode] = useState("");
+  const [newPw,     setNewPw]     = useState("");
+  const [showNewPw, setShowNewPw] = useState(false);
+
+  const handleReset = async (e) => {
+    e.preventDefault();
+    setError(""); setLoading(true);
+    await new Promise(r=>setTimeout(r,300));
+    const user = users.find(u=>u.email.toLowerCase()===resetEmail.trim().toLowerCase());
+    if (!user) { setError("User not found."); setLoading(false); return; }
+    let stored;
+    try { stored = JSON.parse(localStorage.getItem("cfp_reset_"+user.id)||"null"); } catch(e){}
+    if (!stored) { setError("No reset was requested. Start over."); setLoading(false); return; }
+    if (Date.now() > stored.expiry) { setError("Code expired. Request a new one."); setLoading(false); return; }
+    if (resetCode.trim() !== stored.code) { setError("Incorrect code. Check your email."); setLoading(false); return; }
+    if (newPw.length < 8) { setError("Password must be at least 8 characters."); setLoading(false); return; }
+    const hash = await hashPw(newPw);
+    const updated = users.map(u=>u.id===user.id?{...u,hash}:u);
+    saveUsers(updated);
+    try { localStorage.removeItem("cfp_reset_"+user.id); } catch(e){}
+    setLoading(false);
+    setView("login");
+    setEmail(resetEmail);
+    setPassword("");
+    setError("");
+    setResetCode("");
+    setNewPw("");
+  };
+
+  const inp = (val, set, placeholder, type="text") => (
+    <input type={type} value={val} onChange={e=>{set(e.target.value);setError("");}}
+      placeholder={placeholder} required style={iS}
+      onFocus={e=>e.target.style.borderColor="#00C896"}
+      onBlur={e=>e.target.style.borderColor="#1E2D40"}/>
+  );
 
   return (
     <div style={{minHeight:"100vh",background:"#0A0E14",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',system-ui,sans-serif",padding:20}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}input{outline:none}@keyframes fadein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}`}</style>
 
       <div style={{width:"100%",maxWidth:400,animation:"fadein 0.35s ease"}}>
-
         {/* Logo */}
-        <div style={{textAlign:"center",marginBottom:36}}>
+        <div style={{textAlign:"center",marginBottom:32}}>
           <div style={{width:52,height:52,borderRadius:14,background:"linear-gradient(135deg,#00C896,#006644)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,margin:"0 auto 14px"}}>💰</div>
           <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:800,fontSize:22,color:"#E8F0FC",letterSpacing:"-0.02em"}}>CashFlow Pro</div>
-
         </div>
 
-        {/* Card */}
         <div style={{background:"#111820",border:"1px solid #1E2D40",borderRadius:14,padding:32}}>
-          <div style={{fontWeight:700,fontSize:16,color:"#E8F0FC",marginBottom:4}}>Sign in</div>
-          <div style={{fontSize:12,color:"#6B8299",marginBottom:24}}>Authorized personnel only</div>
 
-          <form onSubmit={handleLogin}>
-            {/* Email */}
-            <div style={{marginBottom:14}}>
-              <label style={{fontSize:11,color:"#6B8299",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:700,display:"block",marginBottom:6}}>Email</label>
-              <input type="email" value={email} onChange={e=>{setEmail(e.target.value);setError("");}} placeholder="you@canadamedlaser.ca" required
-                style={{width:"100%",background:"#0A0E14",border:"1px solid #1E2D40",borderRadius:8,padding:"10px 13px",color:"#E8F0FC",fontSize:13,fontFamily:"inherit",transition:"border-color 0.15s"}}
-                onFocus={e=>e.target.style.borderColor="#00C896"}
-                onBlur={e=>e.target.style.borderColor="#1E2D40"}/>
-            </div>
-
-            {/* Password */}
-            <div style={{marginBottom:20}}>
-              <label style={{fontSize:11,color:"#6B8299",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:700,display:"block",marginBottom:6}}>Password</label>
-              <div style={{position:"relative"}}>
-                <input type={showPw?"text":"password"} value={password} onChange={e=>{setPassword(e.target.value);setError("");}} placeholder="Enter your password" required
-                  style={{width:"100%",background:"#0A0E14",border:"1px solid #1E2D40",borderRadius:8,padding:"10px 40px 10px 13px",color:"#E8F0FC",fontSize:13,fontFamily:"inherit",transition:"border-color 0.15s"}}
-                  onFocus={e=>e.target.style.borderColor="#00C896"}
-                  onBlur={e=>e.target.style.borderColor="#1E2D40"}/>
-                <button type="button" onClick={()=>setShowPw(v=>!v)}
-                  style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#6B8299",cursor:"pointer",fontSize:14,padding:2}}>
-                  {showPw?"🙈":"👁"}
+          {/* ── SIGN IN ─────────────────────────────────────── */}
+          {view==="login"&&(<>
+            <div style={{fontWeight:700,fontSize:16,color:"#E8F0FC",marginBottom:4}}>Sign in</div>
+            <div style={{fontSize:12,color:"#6B8299",marginBottom:24}}>Authorized personnel only</div>
+            <form onSubmit={handleLogin}>
+              <div style={{marginBottom:14}}>
+                <label style={{fontSize:11,color:"#6B8299",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:700,display:"block",marginBottom:6}}>Email</label>
+                {inp(email, setEmail, "you@canadamedlaser.ca", "email")}
+              </div>
+              <div style={{marginBottom:8}}>
+                <label style={{fontSize:11,color:"#6B8299",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:700,display:"block",marginBottom:6}}>Password</label>
+                <div style={{position:"relative"}}>
+                  <input type={showPw?"text":"password"} value={password} onChange={e=>{setPassword(e.target.value);setError("");}} placeholder="Enter your password" required
+                    style={{...iS,paddingRight:40}}
+                    onFocus={e=>e.target.style.borderColor="#00C896"}
+                    onBlur={e=>e.target.style.borderColor="#1E2D40"}/>
+                  <button type="button" onClick={()=>setShowPw(v=>!v)}
+                    style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#6B8299",cursor:"pointer",fontSize:14,padding:2}}>
+                    {showPw?"🙈":"👁"}
+                  </button>
+                </div>
+              </div>
+              {/* Forgot password link */}
+              <div style={{textAlign:"right",marginBottom:16}}>
+                <button type="button" onClick={()=>{setView("forgot");setResetEmail(email);setError("");}}
+                  style={{background:"none",border:"none",color:"#4D9EFF",fontSize:12,cursor:"pointer",padding:0,fontFamily:"inherit"}}>
+                  Forgot password?
                 </button>
               </div>
-            </div>
+              {error&&<div style={{background:"#2A0A0A",border:"1px solid #FF4D4D44",borderRadius:8,padding:"9px 13px",marginBottom:14,fontSize:12,color:"#FF4D4D",display:"flex",gap:7}}><span>⚠</span><span>{error}</span></div>}
+              <button type="submit" disabled={loading}
+                style={{width:"100%",background:loading?"#182030":"#00C896",color:loading?"#6B8299":"#000",border:"none",borderRadius:9,padding:"12px 0",fontSize:14,fontWeight:800,cursor:loading?"not-allowed":"pointer",transition:"all 0.2s"}}>
+                {loading?"Signing in…":"Sign In"}
+              </button>
+            </form>
+          </>)}
 
-            {/* Error */}
-            {error&&(
-              <div style={{background:"#2A0A0A",border:"1px solid #FF4D4D44",borderRadius:8,padding:"9px 13px",marginBottom:16,fontSize:12,color:"#FF4D4D",display:"flex",gap:7,alignItems:"center"}}>
-                <span>⚠</span><span>{error}</span>
+          {/* ── FORGOT PASSWORD ─────────────────────────────── */}
+          {view==="forgot"&&(<>
+            <button onClick={()=>{setView("login");setError("");}} style={{background:"none",border:"none",color:"#6B8299",cursor:"pointer",fontSize:12,marginBottom:16,padding:0,display:"flex",alignItems:"center",gap:4,fontFamily:"inherit"}}>← Back to sign in</button>
+            <div style={{fontWeight:700,fontSize:16,color:"#E8F0FC",marginBottom:4}}>Reset password</div>
+            <div style={{fontSize:12,color:"#6B8299",marginBottom:20}}>Enter your email — a reset code will open in your mail app.</div>
+            <form onSubmit={handleForgot}>
+              <div style={{marginBottom:16}}>
+                <label style={{fontSize:11,color:"#6B8299",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:700,display:"block",marginBottom:6}}>Email</label>
+                {inp(resetEmail, setResetEmail, "you@canadamedlaser.ca", "email")}
               </div>
-            )}
+              {error&&<div style={{background:"#2A0A0A",border:"1px solid #FF4D4D44",borderRadius:8,padding:"9px 13px",marginBottom:14,fontSize:12,color:"#FF4D4D",display:"flex",gap:7}}><span>⚠</span><span>{error}</span></div>}
+              <div style={{background:"#0A1525",border:"1px solid #4D9EFF22",borderRadius:8,padding:"9px 13px",marginBottom:16,fontSize:11,color:"#6B8299",lineHeight:1.5}}>
+                This will open your email app with a pre-filled message containing a 6-digit code. Send it to yourself, then enter the code on the next screen.
+              </div>
+              <button type="submit" disabled={loading}
+                style={{width:"100%",background:loading?"#182030":"#4D9EFF",color:loading?"#6B8299":"#000",border:"none",borderRadius:9,padding:"12px 0",fontSize:14,fontWeight:800,cursor:loading?"not-allowed":"pointer",transition:"all 0.2s"}}>
+                {loading?"Sending…":"Send Reset Code"}
+              </button>
+            </form>
+          </>)}
 
-            {/* First-time hint */}
-            <div style={{background:"#0A1A0A",border:"1px solid #00C89622",borderRadius:8,padding:"9px 13px",marginBottom:20,fontSize:11,color:"#6B8299",lineHeight:1.5}}>
-              💡 First time signing in? Enter your email and any password — it will be saved as your password going forward.
-            </div>
+          {/* ── ENTER RESET CODE + NEW PASSWORD ─────────────── */}
+          {view==="reset"&&(<>
+            <button onClick={()=>{setView("forgot");setError("");}} style={{background:"none",border:"none",color:"#6B8299",cursor:"pointer",fontSize:12,marginBottom:16,padding:0,display:"flex",alignItems:"center",gap:4,fontFamily:"inherit"}}>← Back</button>
+            <div style={{fontWeight:700,fontSize:16,color:"#E8F0FC",marginBottom:4}}>Set new password</div>
+            <div style={{fontSize:12,color:"#6B8299",marginBottom:20}}>Check your email for the 6-digit code and set a new password.</div>
+            <form onSubmit={handleReset}>
+              <div style={{marginBottom:14}}>
+                <label style={{fontSize:11,color:"#6B8299",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:700,display:"block",marginBottom:6}}>Reset Code</label>
+                <input type="text" value={resetCode} onChange={e=>{setResetCode(e.target.value.replace(/\D/g,"").slice(0,6));setError("");}}
+                  placeholder="6-digit code from email" maxLength={6} required style={{...iS,letterSpacing:"0.3em",fontSize:18,textAlign:"center"}}
+                  onFocus={e=>e.target.style.borderColor="#00C896"}
+                  onBlur={e=>e.target.style.borderColor="#1E2D40"}/>
+              </div>
+              <div style={{marginBottom:16}}>
+                <label style={{fontSize:11,color:"#6B8299",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:700,display:"block",marginBottom:6}}>New Password</label>
+                <div style={{position:"relative"}}>
+                  <input type={showNewPw?"text":"password"} value={newPw} onChange={e=>{setNewPw(e.target.value);setError("");}}
+                    placeholder="Min 8 characters" required minLength={8}
+                    style={{...iS,paddingRight:40}}
+                    onFocus={e=>e.target.style.borderColor="#00C896"}
+                    onBlur={e=>e.target.style.borderColor="#1E2D40"}/>
+                  <button type="button" onClick={()=>setShowNewPw(v=>!v)}
+                    style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#6B8299",cursor:"pointer",fontSize:14,padding:2}}>
+                    {showNewPw?"🙈":"👁"}
+                  </button>
+                </div>
+              </div>
+              {error&&<div style={{background:"#2A0A0A",border:"1px solid #FF4D4D44",borderRadius:8,padding:"9px 13px",marginBottom:14,fontSize:12,color:"#FF4D4D",display:"flex",gap:7}}><span>⚠</span><span>{error}</span></div>}
+              <button type="submit" disabled={loading||resetCode.length<6||newPw.length<8}
+                style={{width:"100%",background:loading||resetCode.length<6||newPw.length<8?"#182030":"#00C896",color:loading||resetCode.length<6||newPw.length<8?"#6B8299":"#000",border:"none",borderRadius:9,padding:"12px 0",fontSize:14,fontWeight:800,cursor:(loading||resetCode.length<6||newPw.length<8)?"not-allowed":"pointer",transition:"all 0.2s"}}>
+                {loading?"Setting password…":"Set New Password"}
+              </button>
+            </form>
+          </>)}
 
-            <button type="submit" disabled={loading}
-              style={{width:"100%",background:loading?"#182030":"#00C896",color:loading?"#6B8299":"#000",border:"none",borderRadius:9,padding:"12px 0",fontSize:14,fontWeight:800,cursor:loading?"not-allowed":"pointer",transition:"all 0.2s",letterSpacing:"-0.01em"}}>
-              {loading?"Signing in…":"Sign In"}
-            </button>
-          </form>
         </div>
-
-
       </div>
     </div>
   );
