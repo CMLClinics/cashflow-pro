@@ -1963,6 +1963,29 @@ function BankSyncPanel({ entities }){
 
   const connect    = ()          => { window.location.href=`/api/qb-auth?entityId=unassigned`; };
   const connectFor = (entityId)  => { window.location.href=`/api/qb-auth?entityId=${entityId}`; };
+  const [showRealmHelper, setShowRealmHelper] = useState(false);
+  const [manualRealmId,   setManualRealmId]   = useState("");
+  const [manualEntityId,  setManualEntityId]  = useState("");
+  const [manualMsg,       setManualMsg]       = useState(null);
+
+  // Manual connection using realmId + existing token (for cases where picker doesn't show)
+  const connectManual = async () => {
+    if (!manualRealmId || !manualEntityId) return;
+    // Re-assign existing connection or create a placeholder that will get token on next OAuth
+    // Update the entityId mapping for the existing realmId token
+    const r = await fetch("/api/qb-assign",{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({realmId:manualRealmId.trim(), entityId:manualEntityId})
+    }).catch(()=>null);
+    if (r?.ok) {
+      setManualMsg({type:"success", msg:`✓ Assigned realmId ${manualRealmId.slice(0,8)}… to entity`});
+      setManualRealmId(""); setManualEntityId("");
+      setTimeout(()=>{ setManualMsg(null); reload(); }, 2000);
+    } else {
+      // If token doesn't exist yet, we need to connect first then assign
+      setManualMsg({type:"info", msg:"Connect QB first (button above), then use this to reassign if it picked the wrong company."});
+    }
+  };
 
   const reassign = async (realmId, newEntityId) => {
     await fetch("/api/qb-assign",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({realmId,entityId:newEntityId})}).catch(()=>{});
@@ -2011,14 +2034,68 @@ function BankSyncPanel({ entities }){
       </div>
     </div>
 
-    {/* Multi-company instructions */}
-    <div style={{background:"#0A1525",border:`1px solid ${COLORS.blue}44`,borderRadius:10,padding:"12px 14px",marginBottom:16}}>
-      <div style={{fontWeight:700,color:COLORS.blue,fontSize:11,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.08em"}}>Connecting multiple QB companies</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,fontSize:11,color:COLORS.textMid,lineHeight:1.6}}>
-        <div><strong style={{color:COLORS.text}}>Step 1:</strong> Click "+ Add QB Company" → Intuit login page opens → sign in with your QB credentials → select your company → Approve</div>
-        <div><strong style={{color:COLORS.text}}>Step 2:</strong> You return here → the connected company appears below → click <strong style={{color:COLORS.text}}>Assign</strong> to link it to the right entity</div>
-        <div><strong style={{color:COLORS.text}}>Step 3:</strong> To connect a second company — <strong style={{color:COLORS.warning}}>sign out of Intuit first</strong> (visit quickbooks.intuit.com → sign out), then click "+ Add QB Company" again and sign in with the credentials for the next company</div>
-        <div><strong style={{color:COLORS.text}}>Bank accounts:</strong> Once connected, all bank accounts inside that QB company appear automatically — no manual selection needed. All transactions sync from all accounts in that company.</div>
+    {/* How to connect multiple companies */}
+    <div style={{background:"#0A1525",border:`1px solid ${COLORS.blue}44`,borderRadius:10,padding:"14px 16px",marginBottom:16}}>
+      <div style={{fontWeight:700,color:COLORS.blue,fontSize:11,marginBottom:10,textTransform:"uppercase",letterSpacing:"0.08em"}}>How to connect all your QB companies</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,fontSize:11,color:COLORS.textMid,lineHeight:1.7,marginBottom:14}}>
+        <div>
+          <strong style={{color:COLORS.text}}>Step 1 — Find each company's realmId:</strong><br/>
+          Log into QuickBooks Online for one company. Look at the URL in your browser:<br/>
+          <code style={{background:COLORS.bg,padding:"2px 6px",borderRadius:4,fontSize:10,color:COLORS.accent}}>app.qbo.intuit.com/app/homepage?<strong>realmId=9341456713410513</strong></code><br/>
+          Copy that number. That's the realmId for that company.
+        </div>
+        <div>
+          <strong style={{color:COLORS.text}}>Step 2 — Connect once, reassign:</strong><br/>
+          Click <strong style={{color:COLORS.text}}>+ Connect QB</strong> — it will connect whichever company Intuit picks. Then use the <strong style={{color:COLORS.warning}}>Reassign by realmId</strong> tool below to link each connection to the right entity using the realmId you copied from the QB URL.
+        </div>
+      </div>
+
+      {/* realmId lookup table */}
+      <div style={{background:COLORS.bg,borderRadius:8,padding:"10px 12px",marginBottom:12}}>
+        <div style={{fontSize:10,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Your QB companies — find realmId in the URL when logged in</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+          {[
+            {name:"Canada MedLaser Inc",       entity:"CML"},
+            {name:"Canada MedLaser Franchising Inc.", entity:"CMLF"},
+            {name:"CML Academy",               entity:"ACAD"},
+            {name:"Skin Society Bar Inc",       entity:"SSB"},
+            {name:"YECO Marketing Inc",         entity:"YECO"},
+          ].map(({name,entity})=>(
+            <div key={entity} style={{display:"flex",alignItems:"center",gap:8,background:COLORS.surface,borderRadius:6,padding:"6px 10px"}}>
+              <span style={{fontSize:11,color:COLORS.text,fontWeight:600,flex:1}}>{name}</span>
+              <span style={{fontSize:10,color:COLORS.textMid}}>→</span>
+              <span style={{fontSize:11,color:COLORS.accent,fontWeight:700}}>{entity}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Manual reassign tool */}
+      <div style={{borderTop:`1px solid ${COLORS.border}`,paddingTop:12}}>
+        <button onClick={()=>setShowRealmHelper(v=>!v)} style={{background:"none",border:"none",color:COLORS.warning,fontSize:11,cursor:"pointer",fontWeight:700,padding:0,marginBottom:8}}>
+          {showRealmHelper?"▼":"▶"} Reassign connected company by realmId
+        </button>
+        {showRealmHelper&&(
+          <div style={{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}>
+            <div style={{flex:1,minWidth:160}}>
+              <div style={{fontSize:10,color:COLORS.textMid,marginBottom:4}}>realmId (from QB URL)</div>
+              <input value={manualRealmId} onChange={e=>setManualRealmId(e.target.value)}
+                placeholder="e.g. 9341456713410513" style={{...inpS(),padding:"6px 10px",fontSize:12}}/>
+            </div>
+            <div style={{width:160}}>
+              <div style={{fontSize:10,color:COLORS.textMid,marginBottom:4}}>Assign to entity</div>
+              <select value={manualEntityId} onChange={e=>setManualEntityId(e.target.value)} style={{...selS(),padding:"6px 10px",fontSize:12}}>
+                <option value="">— select —</option>
+                {(entities||DEFAULT_ENTITIES).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+            </div>
+            <button onClick={connectManual} disabled={!manualRealmId||!manualEntityId}
+              style={{background:manualRealmId&&manualEntityId?COLORS.accent:"#182030",color:manualRealmId&&manualEntityId?"#000":COLORS.textMid,border:"none",borderRadius:7,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:manualRealmId&&manualEntityId?"pointer":"not-allowed"}}>
+              Assign
+            </button>
+          </div>
+        )}
+        {manualMsg&&<div style={{marginTop:8,fontSize:11,color:manualMsg.type==="success"?COLORS.accent:COLORS.blue,background:manualMsg.type==="success"?COLORS.accentDim:COLORS.blueDim,border:`1px solid ${manualMsg.type==="success"?COLORS.accent:COLORS.blue}33`,borderRadius:6,padding:"6px 10px"}}>{manualMsg.msg}</div>}
       </div>
     </div>
 
