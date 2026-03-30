@@ -566,17 +566,17 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
   const [chartSubTab,   setChartSubTab]   = useState("line"); // "line" | "monthly"
   const [qbConnectMsg,  setQbConnectMsg]  = useState(null);
 
-  // Detect QB OAuth callback redirect (?qb_connected=entityId)
+  // Detect QB OAuth callback redirect (?qb_connected=companyName)
   useEffect(()=>{
     try {
       const params = new URLSearchParams(window.location.search);
       const connected = params.get("qb_connected");
       const qbError   = params.get("qb_error");
       if (connected) {
-        setQbConnectMsg({ type:"success", msg:`✓ QuickBooks connected successfully! You can now sync transactions.` });
+        setQbConnectMsg({ type:"success", msg:`✓ QuickBooks connected: "${decodeURIComponent(connected)}" — go to Settings → Bank Sync to assign it to an entity and sync.` });
         window.history.replaceState({}, "", window.location.pathname);
         setTab("settings"); setSettingsTab("bank sync");
-        setTimeout(()=>setQbConnectMsg(null), 6000);
+        setTimeout(()=>setQbConnectMsg(null), 10000);
       } else if (qbError) {
         setQbConnectMsg({ type:"error", msg:`QB connection failed: ${qbError}` });
         window.history.replaceState({}, "", window.location.pathname);
@@ -1850,145 +1850,195 @@ function CategoriesSettings({categories,setCategories}){
 }
 
 function BankSyncPanel({ entities }){
-  const [connections, setConnections] = useState([]); // [{realmId, entityId, needsReauth}]
+  const [connections, setConnections] = useState([]);
   const [lastSync,    setLastSync]    = useState(null);
   const [loading,     setLoading]     = useState(true);
   const [syncing,     setSyncing]     = useState(false);
   const [syncResult,  setSyncResult]  = useState(null);
+  const [assigning,   setAssigning]   = useState(null); // realmId being reassigned
 
-  // Load connection status on mount
-  useEffect(()=>{
+  const reload = () => {
+    setLoading(true);
     fetch("/api/qb-status")
       .then(r=>r.json())
       .then(d=>{ setConnections(d.connections||[]); setLastSync(d.lastSync); })
       .catch(()=>setConnections([]))
       .finally(()=>setLoading(false));
-  },[]);
+  };
+  useEffect(()=>{ reload(); },[]);
 
-  const isConnected = (entityId) => connections.some(c=>c.entityId===entityId&&!c.needsReauth);
-  const needsReauth = (entityId) => connections.some(c=>c.entityId===entityId&&c.needsReauth);
+  const connect = () => {
+    // Connect without a specific entity — user will assign after
+    window.location.href = `/api/qb-auth?entityId=unassigned`;
+  };
 
-  const connect = (entityId) => {
-    // Redirect to OAuth flow — server handles the redirect to Intuit
+  const connectFor = (entityId) => {
     window.location.href = `/api/qb-auth?entityId=${entityId}`;
   };
 
-  const disconnect = async (entityId) => {
-    const conn = connections.find(c=>c.entityId===entityId);
-    if (!conn) return;
+  const reassign = async (realmId, newEntityId) => {
+    // Update the entityId mapping in KV
+    await fetch("/api/qb-assign", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({realmId, entityId: newEntityId}),
+    }).catch(()=>{});
+    setConnections(prev=>prev.map(c=>c.realmId===realmId?{...c,entityId:newEntityId}:c));
+    setAssigning(null);
+  };
+
+  const disconnect = async (realmId, entityId) => {
     await fetch("/api/qb-disconnect", {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({realmId:conn.realmId, entityId}),
+      body: JSON.stringify({realmId, entityId}),
     });
-    setConnections(prev=>prev.filter(c=>c.entityId!==entityId));
+    setConnections(prev=>prev.filter(c=>c.realmId!==realmId));
   };
 
   const syncNow = async () => {
     setSyncing(true); setSyncResult(null);
     try {
-      const res  = await fetch("/api/qb-sync", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({}) });
-      const data = await res.json();
-      setSyncResult(data);
-      setLastSync(data.syncedAt);
-    } catch(e){ setSyncResult({error: e.message}); }
+      const r = await fetch("/api/qb-sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})});
+      const d = await r.json();
+      setSyncResult(d); setLastSync(d.syncedAt);
+    } catch(e){ setSyncResult({error:e.message}); }
     setSyncing(false);
   };
 
+  const entsById = Object.fromEntries((entities||DEFAULT_ENTITIES).map(e=>[e.id,e]));
+
   return(<div>
     {/* Header */}
-    <div style={{background:COLORS.surface,border:`1px solid ${COLORS.accent}44`,borderRadius:12,padding:16,marginBottom:20,display:"flex",gap:14,alignItems:"flex-start"}}>
+    <div style={{background:COLORS.surface,border:`1px solid ${COLORS.accent}44`,borderRadius:12,padding:16,marginBottom:16,display:"flex",gap:14,alignItems:"flex-start"}}>
       <span style={{fontSize:22}}>🔗</span>
       <div style={{flex:1}}>
         <div style={{fontWeight:700,color:COLORS.accent,fontSize:13,marginBottom:4}}>QuickBooks Integration</div>
-        <div style={{color:COLORS.textMid,fontSize:12,lineHeight:1.6}}>
-          Connect each QuickBooks company file once. After connecting, click "Sync QB" in the top bar to pull the latest transactions. Tokens auto-refresh — you only re-authorize once every ~100 days.
+        <div style={{color:COLORS.textMid,fontSize:12,lineHeight:1.7}}>
+          Click <strong style={{color:COLORS.text}}>Add QB Company</strong> for each of your QuickBooks company files. Intuit will show a company picker — select one company, approve, and it will appear below. Then assign it to the matching entity in your app. Repeat for each company.
         </div>
       </div>
-      {connections.filter(c=>!c.needsReauth).length>0&&(
-        <button onClick={syncNow} disabled={syncing} style={{background:syncing?COLORS.surfaceHigh:COLORS.qb,color:syncing?COLORS.textMid:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:syncing?"not-allowed":"pointer",whiteSpace:"nowrap",flexShrink:0}}>
-          {syncing?"Syncing…":"⬇ Sync All Now"}
+      <div style={{display:"flex",gap:8,flexShrink:0}}>
+        {connections.filter(c=>!c.needsReauth).length>0&&(
+          <button onClick={syncNow} disabled={syncing} style={{background:syncing?COLORS.surfaceHigh:COLORS.qb,color:syncing?COLORS.textMid:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:12,fontWeight:700,cursor:syncing?"not-allowed":"pointer"}}>
+            {syncing?"Syncing…":"⬇ Sync All"}
+          </button>
+        )}
+        <button onClick={connect} style={{background:COLORS.accentDim,border:`1px solid ${COLORS.accent}44`,color:COLORS.accent,borderRadius:8,padding:"8px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+          + Add QB Company
         </button>
-      )}
+      </div>
     </div>
 
-    {/* Last sync + result */}
-    {lastSync&&<div style={{background:COLORS.accentDim,border:`1px solid ${COLORS.accent}33`,borderRadius:8,padding:"8px 14px",marginBottom:16,fontSize:12,color:COLORS.accent}}>
-      ✓ Last sync: {new Date(lastSync).toLocaleString("en-CA")}
-      {syncResult&&!syncResult.error&&` — ${syncResult.totalCount} transactions pulled`}
+    {/* Sync results */}
+    {lastSync&&<div style={{background:COLORS.accentDim,border:`1px solid ${COLORS.accent}33`,borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12,color:COLORS.accent}}>
+      ✓ Last sync: {new Date(lastSync).toLocaleString("en-CA")}{syncResult&&!syncResult.error?` — ${syncResult.totalCount} transactions pulled`:""}
     </div>}
-    {syncResult?.error&&<div style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,borderRadius:8,padding:"8px 14px",marginBottom:16,fontSize:12,color:COLORS.danger}}>✗ Sync error: {syncResult.error}</div>}
+    {syncResult?.error&&<div style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12,color:COLORS.danger}}>✗ {syncResult.error}</div>}
 
-    {/* Setup prerequisites */}
-    <div style={{background:COLORS.warningDim,border:`1px solid ${COLORS.warning}44`,borderRadius:10,padding:"12px 14px",marginBottom:20}}>
-      <div style={{fontWeight:700,color:COLORS.warning,fontSize:12,marginBottom:8}}>⚙ Before connecting — one-time Vercel setup</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-        {[
-          {label:"QB_CLIENT_ID",     desc:"From developer.intuit.com → your app → Keys & credentials"},
-          {label:"QB_CLIENT_SECRET", desc:"Same page as Client ID — never share this"},
-          {label:"QB_REDIRECT_URI",  desc:`https://YOUR-DOMAIN.vercel.app/api/qb-callback  (replace with your actual URL)`},
-          {label:"KV_REST_API_URL",  desc:"From Vercel Dashboard → Storage → KV → Connect"},
-          {label:"KV_REST_API_TOKEN",desc:"Same KV page — copy the REST token"},
-        ].map(({label,desc})=>(
-          <div key={label} style={{background:COLORS.bg,borderRadius:7,padding:"8px 10px"}}>
-            <div style={{fontFamily:"monospace",fontSize:11,color:COLORS.warning,fontWeight:700,marginBottom:2}}>{label}</div>
-            <div style={{fontSize:10,color:COLORS.textMid,lineHeight:1.4}}>{desc}</div>
+    {/* How to connect — step guide */}
+    <div style={{background:"#0A1525",border:`1px solid ${COLORS.blue}33`,borderRadius:10,padding:"12px 14px",marginBottom:16}}>
+      <div style={{fontWeight:700,color:COLORS.blue,fontSize:11,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.08em"}}>How to connect multiple companies</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+        {["1. Click \"+ Add QB Company\"","2. Intuit shows company picker — select one company","3. Approve access — you return here","4. Assign the connected company to your entity below"].map((s,i)=>(
+          <div key={i} style={{background:COLORS.bg,borderRadius:7,padding:"8px 10px",display:"flex",gap:8}}>
+            <div style={{width:18,height:18,borderRadius:"50%",background:COLORS.blue+"22",border:`1px solid ${COLORS.blue}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:COLORS.blue,flexShrink:0}}>{i+1}</div>
+            <div style={{fontSize:11,color:COLORS.textMid,lineHeight:1.5}}>{s.slice(3)}</div>
           </div>
         ))}
       </div>
     </div>
 
-    {/* Entity connection list */}
-    <div style={{fontSize:11,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>Connect Your QB Companies</div>
-    {loading&&<div style={{color:COLORS.textMid,fontSize:12,padding:"20px 0"}}>Checking connections…</div>}
-    {!loading&&(
-      <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,overflow:"hidden"}}>
-        {(entities||DEFAULT_ENTITIES).map((ent,i)=>{
-          const connected  = isConnected(ent.id);
-          const reauth     = needsReauth(ent.id);
-          const conn       = connections.find(c=>c.entityId===ent.id);
+    {/* Connected companies */}
+    <div style={{fontSize:11,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>
+      Connected QB Companies ({connections.length})
+    </div>
+    {loading&&<div style={{color:COLORS.textMid,fontSize:12,padding:"16px 0"}}>Checking connections…</div>}
+    {!loading&&connections.length===0&&(
+      <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:10,padding:"24px",textAlign:"center",color:COLORS.textMid,fontSize:13,marginBottom:16}}>
+        No QB companies connected yet. Click <strong style={{color:COLORS.accent}}>+ Add QB Company</strong> to start.
+      </div>
+    )}
+    {!loading&&connections.length>0&&(
+      <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,overflow:"hidden",marginBottom:20}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 160px 120px",gap:0,background:"#161E2A",borderBottom:`1px solid ${COLORS.border}`}}>
+          {["QB Company (realmId)","Assigned to Entity","Status","Actions"].map(l=>(
+            <div key={l} style={{padding:"8px 14px",fontSize:10,color:"#7A96B0",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600}}>{l}</div>
+          ))}
+        </div>
+        {connections.map((conn,i)=>{
+          const ent = entsById[conn.entityId];
+          const isUnassigned = !ent || conn.entityId==="unassigned";
           return(
-            <div key={ent.id} style={{display:"flex",alignItems:"center",gap:14,padding:"13px 16px",borderBottom:i<(entities||DEFAULT_ENTITIES).length-1?`1px solid ${COLORS.border}`:"none",transition:"background 0.12s"}}>
-              <div style={{width:10,height:10,borderRadius:"50%",background:connected?COLORS.accent:reauth?COLORS.warning:COLORS.textDim,flexShrink:0}}/>
-              <div style={{flex:1}}>
-                <div style={{fontSize:13,color:COLORS.text,fontWeight:600}}>{ent.name}</div>
-                <div style={{fontSize:11,color:COLORS.textMid,marginTop:2}}>
-                  {connected ? `Connected · realmId: ${conn?.realmId||"—"}`
-                  : reauth   ? "⚠ Token expired — please reconnect"
-                  :             "Not connected"}
-                </div>
+            <div key={conn.realmId} style={{display:"grid",gridTemplateColumns:"1fr 1fr 160px 120px",gap:0,padding:"11px 14px",borderBottom:i<connections.length-1?`1px solid ${COLORS.border}`:"none",alignItems:"center"}}>
+              {/* QB Company info */}
+              <div>
+                <div style={{fontSize:13,color:COLORS.text,fontWeight:600}}>{conn.companyName||"Unknown Company"}</div>
+                <div style={{fontSize:10,color:COLORS.textMid,fontFamily:"monospace",marginTop:2}}>realmId: {conn.realmId}</div>
               </div>
-              <Badge color={connected?COLORS.accent:reauth?COLORS.warning:COLORS.textDim}>
-                {connected?"Connected":reauth?"Needs Reauth":"Not Connected"}
-              </Badge>
-              {connected&&!reauth?(
-                <button onClick={()=>disconnect(ent.id)} style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,color:COLORS.danger,borderRadius:7,padding:"6px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>Disconnect</button>
-              ):(
-                <button onClick={()=>connect(ent.id)} style={{background:reauth?COLORS.warningDim:COLORS.accentDim,border:`1px solid ${reauth?COLORS.warning:COLORS.accent}44`,color:reauth?COLORS.warning:COLORS.accent,borderRadius:7,padding:"6px 14px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
-                  {reauth?"Reconnect":"Connect QB"}
-                </button>
-              )}
+              {/* Entity assignment */}
+              <div>
+                {assigning===conn.realmId ? (
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <select defaultValue={conn.entityId} onChange={e=>reassign(conn.realmId,e.target.value)}
+                      style={{...inpS(),padding:"4px 8px",fontSize:12,width:"auto"}}>
+                      <option value="unassigned">— select entity —</option>
+                      {(entities||DEFAULT_ENTITIES).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+                    </select>
+                    <button onClick={()=>setAssigning(null)} style={{background:"none",border:"none",color:COLORS.textMid,cursor:"pointer",fontSize:11}}>✕</button>
+                  </div>
+                ) : (
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    {ent ? (
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <Dot color={ent.color} size={8}/>
+                        <span style={{fontSize:12,color:COLORS.text,fontWeight:600}}>{ent.name}</span>
+                      </div>
+                    ) : (
+                      <span style={{fontSize:12,color:COLORS.warning}}>⚠ Not assigned</span>
+                    )}
+                    <button onClick={()=>setAssigning(conn.realmId)} style={{background:COLORS.blueDim,border:`1px solid ${COLORS.blue}33`,color:COLORS.blue,borderRadius:5,padding:"2px 7px",fontSize:10,cursor:"pointer",fontWeight:700}}>
+                      {isUnassigned?"Assign":"Change"}
+                    </button>
+                  </div>
+                )}
+              </div>
+              {/* Status */}
+              <div>
+                <Badge color={conn.needsReauth?COLORS.warning:COLORS.accent}>
+                  {conn.needsReauth?"Needs Reauth":"Connected"}
+                </Badge>
+              </div>
+              {/* Actions */}
+              <div style={{display:"flex",gap:6}}>
+                {conn.needsReauth&&(
+                  <button onClick={()=>connectFor(conn.entityId)} style={{background:COLORS.warningDim,border:`1px solid ${COLORS.warning}33`,color:COLORS.warning,borderRadius:6,padding:"4px 10px",fontSize:10,fontWeight:700,cursor:"pointer"}}>Reconnect</button>
+                )}
+                <button onClick={()=>disconnect(conn.realmId,conn.entityId)} style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,color:COLORS.danger,borderRadius:6,padding:"4px 10px",fontSize:10,fontWeight:700,cursor:"pointer"}}>Remove</button>
+              </div>
             </div>
           );
         })}
       </div>
     )}
 
-    {/* How it works */}
-    <div style={{marginTop:22}}>
-      <div style={{fontSize:11,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>How the sync works</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
-        {[
-          {icon:"🔐",title:"OAuth 2.0",desc:"You click Connect → Intuit login → approve → token stored securely in Vercel KV. Your QB password never touches this app."},
-          {icon:"⬇",title:"Delta sync",desc:"Each sync only pulls transactions newer than the last sync date. No duplicates, no full re-pulls. Fast and efficient."},
-          {icon:"🔄",title:"Auto token refresh",desc:"Access tokens expire in 1 hour but refresh silently. Refresh tokens last 101 days — you'll get a reminder when re-auth is needed."},
-        ].map(({icon,title,desc})=>(
-          <div key={title} style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:10,padding:"13px 14px"}}>
-            <div style={{fontSize:20,marginBottom:8}}>{icon}</div>
-            <div style={{fontWeight:700,fontSize:12,color:COLORS.text,marginBottom:5}}>{title}</div>
-            <div style={{fontSize:11,color:COLORS.textMid,lineHeight:1.6}}>{desc}</div>
+    {/* Entity status summary */}
+    <div style={{fontSize:11,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>Entity Connection Status</div>
+    <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,overflow:"hidden"}}>
+      {(entities||DEFAULT_ENTITIES).map((ent,i)=>{
+        const conn = connections.find(c=>c.entityId===ent.id&&!c.needsReauth);
+        const hasConn = !!conn;
+        return(
+          <div key={ent.id} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",borderBottom:i<(entities||DEFAULT_ENTITIES).length-1?`1px solid ${COLORS.border}`:"none"}}>
+            <div style={{width:10,height:10,borderRadius:"50%",background:hasConn?COLORS.accent:COLORS.textDim,flexShrink:0}}/>
+            <Dot color={ent.color} size={9}/>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,color:COLORS.text,fontWeight:600}}>{ent.name}</div>
+              <div style={{fontSize:11,color:COLORS.textMid}}>{hasConn?`${conn.companyName||"QB Company"} connected`:"No QB company assigned — click Connect QB"}</div>
+            </div>
+            <Badge color={hasConn?COLORS.accent:COLORS.textDim}>{hasConn?"Syncing":"Not connected"}</Badge>
+            {!hasConn&&<button onClick={()=>connectFor(ent.id)} style={{background:COLORS.accentDim,border:`1px solid ${COLORS.accent}44`,color:COLORS.accent,borderRadius:7,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>Connect QB</button>}
           </div>
-        ))}
-      </div>
+        );
+      })}
     </div>
   </div>);
 }

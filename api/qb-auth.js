@@ -1,22 +1,21 @@
-// api/qb-auth.js — Step 1: Redirect to Intuit OAuth consent screen
+// api/qb-auth.js — Redirect to Intuit OAuth
+// For multi-company: user connects one company at a time.
+// Each connection is stored by realmId — they accumulate, not overwrite.
 
 export default function handler(req, res) {
   const clientId    = process.env.QB_CLIENT_ID;
   const redirectUri = process.env.QB_REDIRECT_URI;
-  const state       = req.query.entityId || "default";
+  const entityId    = req.query.entityId || "default";
 
-  if (!clientId) {
+  if (!clientId || !redirectUri) {
     return res.status(500).send(`
-      <h2>Missing QB_CLIENT_ID</h2>
-      <p>Add QB_CLIENT_ID to Vercel Environment Variables and redeploy.</p>
-    `);
-  }
-  if (!redirectUri) {
-    return res.status(500).send(`
-      <h2>Missing QB_REDIRECT_URI</h2>
-      <p>Add QB_REDIRECT_URI to Vercel Environment Variables.</p>
-      <p>It must be set to exactly: <strong>https://${req.headers.host}/api/qb-callback</strong></p>
-      <p>And that exact URL must be whitelisted in your Intuit Developer app under Redirect URIs.</p>
+      <h2 style="font-family:sans-serif">Setup incomplete</h2>
+      <p>Add these to Vercel → Settings → Environment Variables:</p>
+      <ul style="font-family:monospace">
+        <li>QB_CLIENT_ID</li>
+        <li>QB_CLIENT_SECRET</li>
+        <li>QB_REDIRECT_URI = https://${req.headers.host}/api/qb-callback</li>
+      </ul>
     `);
   }
 
@@ -25,10 +24,9 @@ export default function handler(req, res) {
   url.searchParams.set("scope",         "com.intuit.quickbooks.accounting");
   url.searchParams.set("redirect_uri",  redirectUri);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("state",         state);
-
-  // Log for debugging
-  console.log("QB Auth redirect:", { redirectUri, clientId: clientId.slice(0,8)+"..." });
+  url.searchParams.set("state",         entityId);
+  // prompt=select_account forces Intuit to show company picker every time
+  url.searchParams.set("prompt",        "select_account");
 
   res.redirect(302, url.toString());
 }
