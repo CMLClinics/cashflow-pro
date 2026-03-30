@@ -561,14 +561,10 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
   const [dateFrom,      setDateFrom]      = useState("");
   const [dateTo,        setDateTo]        = useState("");
   const [forecastDays,  setForecastDays]  = useState(30);
-  const [dateFrom,      setDateFrom]      = useState("");
-  const [dateTo,        setDateTo]        = useState("");
   const [chartSubTab,   setChartSubTab]   = useState("line");
   const [qbConnectMsg,  setQbConnectMsg]  = useState(null);
   const [syncing,       setSyncing]       = useState(false);
   const [syncMsg,       setSyncMsg]       = useState(null);
-  const [chartSubTab,   setChartSubTab]   = useState("line"); // "line" | "monthly"
-  const [qbConnectMsg,  setQbConnectMsg]  = useState(null);
 
   // Detect QB OAuth callback redirect (?qb_connected=entityId)
   useEffect(()=>{
