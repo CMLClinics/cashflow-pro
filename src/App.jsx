@@ -20,6 +20,7 @@ const VIEW_HASH  = "3d7f3c4c6bb9d5a8e0f7e6b2c1a4d9e8f2b5c0a7d3e6b9c2a5d8e1f4b7c0
 // We'll hash at runtime to be safe
 const SESSION_KEY = "cfp_session_v1";
 const USERS_KEY   = "cfp_users_v1";
+const DATA_KEY    = "cfp_data_v1"; // persists entities, accounts, categories, projections, txns
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TOKENS
@@ -147,8 +148,8 @@ const Fld  = ({label,children})=><div><div style={{fontSize:10,color:C.textDim,t
 const Empty= ({msg})=><div style={{padding:"36px 20px",textAlign:"center",color:C.textDim,fontSize:13}}>{msg}</div>;
 
 function ColHdr({cols,labels}){
-  return <div style={{display:"grid",gridTemplateColumns:cols,gap:10,padding:"8px 14px",borderBottom:`1px solid ${C.border}`,background:C.surfaceHigh}}>
-    {labels.map(l=><span key={l} style={{fontSize:10,color:C.textDim,textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:700}}>{l}</span>)}
+  return <div style={{display:"grid",gridTemplateColumns:cols,gap:10,padding:"8px 14px",borderBottom:`1px solid ${C.border}`,background:"#161E2A"}}>
+    {labels.map(l=><span key={l} style={{fontSize:10,color:"#7A96B0",textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:600}}>{l}</span>)}
   </div>;
 }
 function KpiCard({label,value,color=C.accent,sub}){
@@ -533,29 +534,86 @@ function UserManagement({ users, saveUsers, currentUser }) {
 function CashFlowPro({ session, onLogout, users, saveUsers }) {
   const isAdmin = session?.user?.role === "admin";
 
-  const [entities,   setEntities]   = useState(DEFAULT_ENTITIES);
-  const [accounts,   setAccounts]   = useState(DEFAULT_ACCOUNTS);
-  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
-  const [projections,setProjections]= useState(DEFAULT_PROJECTIONS);
-  const [actualTxns, setActualTxns] = useState(()=>
-    DEFAULT_ACCOUNTS.flatMap(acc=>{const e=DEFAULT_ENTITIES.find(x=>x.id===acc.entityId); return e?genTxns(acc,e,DEFAULT_CATEGORIES):[];})
-  );
+  // ── Load persisted data or fall back to defaults ──────────────────────────
+  const loadData = () => {
+    try {
+      const raw = localStorage.getItem(DATA_KEY);
+      if (raw) {
+        const d = JSON.parse(raw);
+        return {
+          entities:    d.entities    || DEFAULT_ENTITIES,
+          accounts:    d.accounts    || DEFAULT_ACCOUNTS,
+          categories:  d.categories  || DEFAULT_CATEGORIES,
+          projections: d.projections || DEFAULT_PROJECTIONS,
+          actualTxns:  d.actualTxns  || DEFAULT_ACCOUNTS.flatMap(acc=>{const e=DEFAULT_ENTITIES.find(x=>x.id===acc.entityId);return e?genTxns(acc,e,DEFAULT_CATEGORIES):[];}),
+          skippedOccs: new Set(d.skippedOccs||[]),
+        };
+      }
+    } catch(e){}
+    return {
+      entities:    DEFAULT_ENTITIES,
+      accounts:    DEFAULT_ACCOUNTS,
+      categories:  DEFAULT_CATEGORIES,
+      projections: DEFAULT_PROJECTIONS,
+      actualTxns:  DEFAULT_ACCOUNTS.flatMap(acc=>{const e=DEFAULT_ENTITIES.find(x=>x.id===acc.entityId);return e?genTxns(acc,e,DEFAULT_CATEGORIES):[];}),
+      skippedOccs: new Set(),
+    };
+  };
+
+  const initData = loadData();
+  const [entities,   setEntities]   = useState(initData.entities);
+  const [accounts,   setAccounts]   = useState(initData.accounts);
+  const [categories, setCategories] = useState(initData.categories);
+  const [projections,setProjections]= useState(initData.projections);
+  const [actualTxns, setActualTxns] = useState(initData.actualTxns);
+
+  // ── Auto-save all data to localStorage on any change ─────────────────────
+  useEffect(()=>{
+    try {
+      localStorage.setItem(DATA_KEY, JSON.stringify({
+        entities, accounts, categories, projections,
+        actualTxns,
+        skippedOccs: [...skippedOccs],
+      }));
+    } catch(e){}
+  },[entities, accounts, categories, projections, actualTxns, skippedOccs]);
 
   const [tab,           setTab]           = useState("dashboard");
   const [settingsTab,   setSettingsTab]   = useState("entities");
   const [filterEntity,  setFilterEntity]  = useState("all");
   const [filterAccount, setFilterAccount] = useState("all");
   const [txnTypeFilter, setTxnTypeFilter] = useState("all");
-  const [txnStatusFilter,setTxnStatusFilter]=useState("all"); // all|actual|projected
+  const [txnStatusFilter,setTxnStatusFilter]=useState("all");
+  const [dateFrom,      setDateFrom]      = useState("");
+  const [dateTo,        setDateTo]        = useState("");
   const [forecastDays,  setForecastDays]  = useState(30);
   const [syncing,       setSyncing]       = useState(false);
   const [syncMsg,       setSyncMsg]       = useState(null);
+  const [chartSubTab,   setChartSubTab]   = useState("line"); // "line" | "monthly"
+  const [qbConnectMsg,  setQbConnectMsg]  = useState(null);
+
+  // Detect QB OAuth callback redirect (?qb_connected=entityId)
+  useEffect(()=>{
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get("qb_connected");
+    const qbError   = params.get("qb_error");
+    if (connected) {
+      const ent = entities.find(e=>e.id===connected);
+      setQbConnectMsg({ type:"success", msg:`✓ QuickBooks connected for ${ent?.name||connected}! You can now sync transactions.` });
+      window.history.replaceState({}, "", window.location.pathname);
+      setTab("settings"); setSettingsTab("bank sync");
+      setTimeout(()=>setQbConnectMsg(null), 6000);
+    } else if (qbError) {
+      setQbConnectMsg({ type:"error", msg:`QB connection failed: ${qbError}` });
+      window.history.replaceState({}, "", window.location.pathname);
+      setTimeout(()=>setQbConnectMsg(null), 6000);
+    }
+  },[]);
 
   // ── Delete state ─────────────────────────────────────────────────────────
   const [selectedIds,   setSelectedIds]   = useState(new Set());
-  const [confirmModal,  setConfirmModal]  = useState(null); // null | {mode, row?, projMode?}
-  // skippedOccurrences: Set of occId strings — individual proj occurrences to skip
-  const [skippedOccs,   setSkippedOccs]  = useState(new Set());
+  const [confirmModal,  setConfirmModal]  = useState(null);
+  const [skippedOccs,   setSkippedOccs]  = useState(initData.skippedOccs);
 
   const toggleSelect = (id) => setSelectedIds(prev => {
     const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
@@ -665,9 +723,12 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
 
   // Apply type + status filters on top of unified ledger
   const displayLedger = useMemo(()=>unifiedLedger
-    .filter(r=>(txnTypeFilter==="all"||r.type===txnTypeFilter)&&(txnStatusFilter==="all"||r._status===txnStatusFilter))
-    .reverse(), // newest first for display
-  [unifiedLedger,txnTypeFilter,txnStatusFilter]);
+    .filter(r=>(txnTypeFilter==="all"||r.type===txnTypeFilter)
+             &&(txnStatusFilter==="all"||r._status===txnStatusFilter)
+             &&(!dateFrom||r._date>=dateFrom)
+             &&(!dateTo||r._date<=dateTo))
+    .reverse(),
+  [unifiedLedger,txnTypeFilter,txnStatusFilter,dateFrom,dateTo]);
 
   // KPIs from unified ledger
   const kpi = useMemo(()=>{
@@ -688,23 +749,60 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
     };
   },[unifiedLedger,openingBalance]);
 
-  // QB Sync
-  const handleSync = ()=>{
-    setSyncing(true);
-    setTimeout(()=>{
+  // QB Sync — calls real API, falls back to mock if not connected
+  const handleSync = async () => {
+    setSyncing(true); setSyncMsg(null);
+    try {
+      const res  = await fetch("/api/qb-sync", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ sinceDate: dateStr(addDays(TODAY,-30)) }),
+      });
+      if (!res.ok) throw new Error("API error "+res.status);
+      const data = await res.json();
+
+      if (data.transactions && data.transactions.length > 0) {
+        // Deduplicate: skip any transaction whose qbId already exists
+        const existingQbIds = new Set(actualTxns.map(t=>t.qbId).filter(Boolean));
+        const newTxns = data.transactions
+          .filter(t => !existingQbIds.has(t.qbId))
+          .map(t => ({ ...t, id: t.qbId || uid(), status:"actual" }));
+
+        if (newTxns.length > 0) {
+          setActualTxns(prev=>[...newTxns,...prev]);
+          setSyncMsg(`Synced ${newTxns.length} new transactions from QuickBooks`);
+        } else {
+          setSyncMsg("Already up to date — no new transactions");
+        }
+      } else if (data.message) {
+        // Not connected yet — fall back to demo
+        const targetAccs = filterAccount!=="all"
+          ? accounts.filter(a=>a.id===filterAccount)
+          : availAccounts.slice(0,3);
+        const mockTxns = targetAccs.flatMap(acc=>{
+          const e=entities.find(x=>x.id===acc.entityId); if(!e) return [];
+          return genTxns(acc,e,categories).slice(0,3).map(t=>({
+            ...t,id:uid(),date:TODAY_STR,description:"Demo — "+t.description,status:"actual"
+          }));
+        });
+        setActualTxns(prev=>[...mockTxns,...prev]);
+        setSyncMsg(`Demo mode: ${mockTxns.length} mock transactions added. Connect QB in Settings → Bank Sync.`);
+      }
+    } catch(e) {
+      // API not deployed yet — use demo mode
       const targetAccs = filterAccount!=="all"
         ? accounts.filter(a=>a.id===filterAccount)
         : availAccounts.slice(0,3);
-      const newTxns = targetAccs.flatMap(acc=>{
-        const e=entities.find(x=>x.id===acc.entityId); if(!e) return [];
-        return genTxns(acc,e,categories).slice(0,3).map(t=>({
-          ...t,id:uid(),date:TODAY_STR,description:"QB — "+t.description,status:"actual"
+      const mockTxns = targetAccs.flatMap(acc=>{
+        const ent=entities.find(x=>x.id===acc.entityId); if(!ent) return [];
+        return genTxns(acc,ent,categories).slice(0,3).map(t=>({
+          ...t,id:uid(),date:TODAY_STR,description:"Demo — "+t.description,status:"actual"
         }));
       });
-      setActualTxns(prev=>[...newTxns,...prev]);
-      setSyncing(false); setSyncMsg(`Synced ${newTxns.length} transactions`);
-      setTimeout(()=>setSyncMsg(null),4000);
-    },2000);
+      setActualTxns(prev=>[...mockTxns,...prev]);
+      setSyncMsg(`Demo mode: ${mockTxns.length} transactions added`);
+    }
+    setSyncing(false);
+    setTimeout(()=>setSyncMsg(null),5000);
   };
 
   // Chart data — daily balance points
@@ -801,6 +899,12 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
       </div>
 
       <div style={{maxWidth:1400,margin:"0 auto",padding:"22px 20px 60px",animation:"fadein 0.25s ease"}}>
+        {/* QB connection result banner */}
+        {qbConnectMsg&&(
+          <div style={{background:qbConnectMsg.type==="success"?C.accentDim:C.dangerDim,border:`1px solid ${qbConnectMsg.type==="success"?C.accent:C.danger}44`,borderRadius:10,padding:"11px 16px",marginBottom:16,fontSize:13,color:qbConnectMsg.type==="success"?C.accent:C.danger,display:"flex",alignItems:"center",gap:10}}>
+            {qbConnectMsg.msg}
+          </div>
+        )}
 
         {/* ══════════════════════════════════════════════════════════════════
             DASHBOARD
@@ -846,10 +950,10 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
             TRANSACTIONS (unified ledger)
         ══════════════════════════════════════════════════════════════════ */}
         {tab==="transactions"&&(<>
-          {/* Confirm delete modal */}
+          {/* Confirm delete modal — in-flow overlay (position:fixed breaks in iframes) */}
           {confirmModal&&(
-            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <div style={{background:C.surface,border:`1px solid ${confirmModal.row?._status==="projected"?C.blue+"66":C.danger+"66"}`,borderRadius:14,padding:28,maxWidth:460,width:"92%",boxShadow:"0 24px 60px rgba(0,0,0,0.6)"}}>
+            <div style={{minHeight:300,background:"rgba(0,0,0,0.75)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16,padding:20}}>
+              <div style={{background:C.surface,border:`1px solid ${confirmModal.row?._status==="projected"?C.blue+"66":C.danger+"66"}`,borderRadius:14,padding:28,maxWidth:460,width:"100%"}}>
 
                 {/* Single actual txn */}
                 {confirmModal.mode==="single"&&confirmModal.row?._status!=="projected"&&(<>
@@ -932,13 +1036,22 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
             </div>
           )}
 
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,flexWrap:"wrap",gap:10}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,flexWrap:"wrap",gap:10}}>
             <SectionHead title="Transactions" sub={`Unified ledger — actual + projected · running balance per line`}/>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+              {/* Date range */}
+              <span style={{fontSize:11,color:C.textMid}}>From</span>
+              <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}
+                style={{...inpS,width:130,padding:"5px 9px"}}/>
+              <span style={{fontSize:11,color:C.textMid}}>To</span>
+              <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}
+                style={{...inpS,width:130,padding:"5px 9px"}}/>
+              {(dateFrom||dateTo)&&<button onClick={()=>{setDateFrom("");setDateTo("");}} style={{background:C.surfaceHigh,border:`1px solid ${C.border}`,color:C.textMid,borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer"}}>✕ Clear</button>}
+              <div style={{width:1,background:C.border,margin:"0 4px",height:20}}/>
               {["all","actual","projected"].map(f=>(
                 <button key={f} onClick={()=>{setTxnStatusFilter(f);clearSelection();}} style={{background:txnStatusFilter===f?(f==="actual"?C.accentDim:f==="projected"?C.blueDim:C.surfaceHigh):"transparent",color:txnStatusFilter===f?(f==="actual"?C.accent:f==="projected"?C.blue:C.text):C.textMid,border:`1px solid ${txnStatusFilter===f?(f==="actual"?C.accent+"44":f==="projected"?C.blue+"44":C.border):C.border}`,borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"capitalize"}}>{f==="all"?"All":f==="actual"?"Actual (QB)":"Projected"}</button>
               ))}
-              <div style={{width:1,background:C.border,margin:"0 4px"}}/>
+              <div style={{width:1,background:C.border,margin:"0 4px",height:20}}/>
               {["all","income","expense"].map(f=>(
                 <button key={f} onClick={()=>setTxnTypeFilter(f)} style={{background:txnTypeFilter===f?(f==="income"?C.accentDim:f==="expense"?C.dangerDim:C.surfaceHigh):"transparent",color:txnTypeFilter===f?(f==="income"?C.accent:f==="expense"?C.danger:C.text):C.textMid,border:`1px solid ${txnTypeFilter===f?(f==="income"?C.accent+"44":f==="expense"?C.danger+"44":C.border):C.border}`,borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"capitalize"}}>{f}</button>
               ))}
@@ -1005,14 +1118,26 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
         ══════════════════════════════════════════════════════════════════ */}
         {tab==="cashflow"&&(<>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,flexWrap:"wrap",gap:10}}>
-            <SectionHead title="Cashflow Chart" sub={`Opening ${fmtShort(kpi.opening)} → Current ${fmtShort(kpi.current)} → Ending ${fmtShort(kpi.ending)}`}/>
-            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <div style={{display:"flex",gap:0,borderBottom:`2px solid ${C.border}`}}>
+              {[{k:"line",l:"Cashflow Chart"},{k:"monthly",l:"Monthly by Category"}].map(({k,l})=>(
+                <button key={k} onClick={()=>setChartSubTab(k)} style={{background:"transparent",color:chartSubTab===k?C.accent:C.textMid,border:"none",borderBottom:chartSubTab===k?`2px solid ${C.accent}`:"2px solid transparent",marginBottom:-2,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:"pointer",letterSpacing:"0.02em",transition:"all 0.15s"}}>{l}</button>
+              ))}
+            </div>
+            {chartSubTab==="line"&&<div style={{display:"flex",gap:6,alignItems:"center"}}>
               <span style={{fontSize:11,color:C.textMid}}>Horizon:</span>
               {[14,30,60,90].map(d=>(
                 <button key={d} onClick={()=>setForecastDays(d)} style={{background:forecastDays===d?C.accentDim:"transparent",color:forecastDays===d?C.accent:C.textMid,border:`1px solid ${forecastDays===d?C.accent+"44":C.border}`,borderRadius:6,padding:"5px 11px",fontSize:11,fontWeight:700,cursor:"pointer"}}>{d}d</button>
               ))}
-            </div>
+            </div>}
           </div>
+
+          {/* Monthly by Category Report */}
+          {chartSubTab==="monthly"&&(
+            <MonthlyCategoryReport actualTxns={filteredActuals} categories={categories} entities={entities} filterEntity={filterEntity}/>
+          )}
+
+          {/* Line chart section */}
+          {chartSubTab==="line"&&(<>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:18}}>
             <KpiCard label="Opening Balance"  value={fmtShort(kpi.opening)} color={C.textMid}/>
             <KpiCard label="Current Balance"  value={fmtShort(kpi.current)} color={balColor(kpi.current, overdraftLimit)}/>
@@ -1099,6 +1224,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
               ))}
             </div>
           </div>
+          </>)}
         </>)}
 
         {/* ══════════════════════════════════════════════════════════════════
@@ -1111,6 +1237,170 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
         )}
 
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MONTHLY CASHFLOW BY CATEGORY REPORT
+// ─────────────────────────────────────────────────────────────────────────────
+function MonthlyCategoryReport({ actualTxns, categories, entities, filterEntity }) {
+  const [reportType, setReportType] = useState("both"); // "income"|"expense"|"both"
+  const [months,     setMonths]     = useState(6);
+
+  // Build list of last N months
+  const monthList = useMemo(() => {
+    const list = [];
+    for (let i = months - 1; i >= 0; i--) {
+      const d = addMonths(TODAY, -i);
+      list.push({ key: dateStr(d).slice(0, 7), label: d.toLocaleString("en-CA", { month: "short", year: "numeric" }) });
+    }
+    return list;
+  }, [months]);
+
+  // Aggregate txns by category × month
+  const data = useMemo(() => {
+    const monthKeys = new Set(monthList.map(m => m.key));
+    const map = {}; // catId → { monthKey → total }
+    actualTxns.forEach(t => {
+      const mk = t.date.slice(0, 7);
+      if (!monthKeys.has(mk)) return;
+      if (reportType !== "both" && t.type !== reportType) return;
+      if (!map[t.categoryId]) map[t.categoryId] = {};
+      map[t.categoryId][mk] = (map[t.categoryId][mk] || 0) + (t.type === "income" ? t.amount : -t.amount);
+    });
+
+    // Row totals
+    return Object.entries(map)
+      .map(([catId, monthly]) => {
+        const cat = categories.find(c => c.id === catId);
+        const total = Object.values(monthly).reduce((s, v) => s + v, 0);
+        return { cat, monthly, total };
+      })
+      .filter(r => r.cat)
+      .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+  }, [actualTxns, categories, monthList, reportType]);
+
+  // Monthly net totals (bottom row)
+  const monthlyNet = useMemo(() => {
+    const net = {};
+    data.forEach(row => {
+      monthList.forEach(m => {
+        net[m.key] = (net[m.key] || 0) + (row.monthly[m.key] || 0);
+      });
+    });
+    return net;
+  }, [data, monthList]);
+
+  const maxAbs = Math.max(...data.flatMap(r => monthList.map(m => Math.abs(r.monthly[m.key] || 0))), 1);
+
+  return (
+    <div style={{ animation: "fadein 0.25s ease" }}>
+      {/* Controls */}
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 11, color: C.textMid }}>Show:</span>
+        {[{ k: "both", l: "Income & Expense" }, { k: "income", l: "Income only" }, { k: "expense", l: "Expense only" }].map(({ k, l }) => (
+          <button key={k} onClick={() => setReportType(k)} style={{ background: reportType === k ? C.accentDim : "transparent", color: reportType === k ? C.accent : C.textMid, border: `1px solid ${reportType === k ? C.accent + "44" : C.border}`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{l}</button>
+        ))}
+        <div style={{ width: 1, background: C.border, height: 18 }} />
+        <span style={{ fontSize: 11, color: C.textMid }}>Months:</span>
+        {[3, 6, 12].map(m => (
+          <button key={m} onClick={() => setMonths(m)} style={{ background: months === m ? C.blueDim : "transparent", color: months === m ? C.blue : C.textMid, border: `1px solid ${months === m ? C.blue + "44" : C.border}`, borderRadius: 6, padding: "5px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{m}mo</button>
+        ))}
+      </div>
+
+      {/* Table */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "auto" }}>
+        {/* Header row */}
+        <div style={{ display: "grid", gridTemplateColumns: `180px repeat(${monthList.length}, 1fr) 110px`, gap: 0, background: "#161E2A", borderBottom: `1px solid ${C.border}`, minWidth: 500 }}>
+          <div style={{ padding: "8px 14px", fontSize: 10, color: "#7A96B0", textTransform: "uppercase", letterSpacing: "0.09em", fontWeight: 600 }}>Category</div>
+          {monthList.map(m => (
+            <div key={m.key} style={{ padding: "8px 8px", fontSize: 10, color: "#7A96B0", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, textAlign: "right" }}>{m.label}</div>
+          ))}
+          <div style={{ padding: "8px 14px", fontSize: 10, color: "#7A96B0", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, textAlign: "right" }}>Total</div>
+        </div>
+
+        {data.length === 0 && <Empty msg="No transaction data for the selected period." />}
+
+        {data.map(({ cat, monthly, total }) => (
+          <div key={cat.id} className="rh" style={{ display: "grid", gridTemplateColumns: `180px repeat(${monthList.length}, 1fr) 110px`, gap: 0, borderBottom: `1px solid ${C.border}`, minWidth: 500, transition: "background 0.12s" }}>
+            {/* Category name */}
+            <div style={{ padding: "9px 14px", display: "flex", alignItems: "center", gap: 7 }}>
+              <Dot color={cat.color} size={7} />
+              <span style={{ fontSize: 12, color: C.text, fontWeight: 500 }}>{cat.name}</span>
+              <span style={{ fontSize: 9, color: cat.type === "income" ? C.accent : C.danger, textTransform: "uppercase", fontWeight: 700 }}>{cat.type === "income" ? "▲" : "▼"}</span>
+            </div>
+            {/* Monthly cells with bar */}
+            {monthList.map(m => {
+              const val = monthly[m.key] || 0;
+              const barW = val !== 0 ? Math.max(3, Math.round((Math.abs(val) / maxAbs) * 60)) : 0;
+              const isPos = val >= 0;
+              return (
+                <div key={m.key} style={{ padding: "9px 8px", textAlign: "right", position: "relative" }}>
+                  {barW > 0 && (
+                    <div style={{ position: "absolute", bottom: 4, right: 8, height: 3, width: barW, background: isPos ? C.accent + "55" : C.danger + "55", borderRadius: 2 }} />
+                  )}
+                  <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color: val === 0 ? C.textDim : isPos ? C.accent : C.danger }}>
+                    {val === 0 ? "—" : (isPos ? "+" : "") + fmtShort(val)}
+                  </span>
+                </div>
+              );
+            })}
+            {/* Row total */}
+            <div style={{ padding: "9px 14px", textAlign: "right" }}>
+              <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 800, color: total >= 0 ? C.accent : C.danger }}>
+                {total >= 0 ? "+" : ""}{fmtShort(total)}
+              </span>
+            </div>
+          </div>
+        ))}
+
+        {/* Net row */}
+        {data.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: `180px repeat(${monthList.length}, 1fr) 110px`, gap: 0, borderTop: `2px solid ${C.border}`, background: C.surfaceHigh, minWidth: 500 }}>
+            <div style={{ padding: "10px 14px", fontSize: 12, fontWeight: 800, color: C.text }}>Net Cash Flow</div>
+            {monthList.map(m => {
+              const val = monthlyNet[m.key] || 0;
+              return (
+                <div key={m.key} style={{ padding: "10px 8px", textAlign: "right" }}>
+                  <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 800, color: balColor(val, 0) }}>
+                    {val >= 0 ? "+" : ""}{fmtShort(val)}
+                  </span>
+                </div>
+              );
+            })}
+            <div style={{ padding: "10px 14px", textAlign: "right" }}>
+              <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 800, color: balColor(Object.values(monthlyNet).reduce((s, v) => s + v, 0), 0) }}>
+                {fmtShort(Object.values(monthlyNet).reduce((s, v) => s + v, 0))}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Mini bar chart — monthly net */}
+      {data.length > 0 && (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "16px 20px", marginTop: 16 }}>
+          <div style={{ fontSize: 11, color: C.textMid, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 14 }}>Monthly Net Cash Flow</div>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", height: 80 }}>
+            {monthList.map(m => {
+              const val = monthlyNet[m.key] || 0;
+              const maxNet = Math.max(...monthList.map(mm => Math.abs(monthlyNet[mm.key] || 0)), 1);
+              const h = Math.max(4, Math.round((Math.abs(val) / maxNet) * 64));
+              const isPos = val >= 0;
+              return (
+                <div key={m.key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                  <div style={{ fontSize: 9, color: isPos ? C.accent : C.danger, fontWeight: 700, fontFamily: "monospace" }}>
+                    {val === 0 ? "" : (isPos ? "+" : "") + fmtShort(val).replace("CA", "").replace(",000", "k")}
+                  </div>
+                  <div style={{ width: "100%", maxWidth: 40, height: h, background: isPos ? C.accent + "88" : C.danger + "88", borderRadius: "4px 4px 0 0", border: `1px solid ${isPos ? C.accent + "66" : C.danger + "66"}` }} />
+                  <div style={{ fontSize: 9, color: C.textMid, textAlign: "center" }}>{m.label.split(" ")[0]}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1365,7 +1655,7 @@ function SettingsTab({entities,setEntities,accounts,setAccounts,categories,setCa
     {settingsTab==="accounts"  &&<AccountsSettings  accounts={accounts}  setAccounts={setAccounts}  entities={entities}/>}
     {settingsTab==="categories"&&<CategoriesSettings categories={categories} setCategories={setCategories}/>}
     {settingsTab==="users"     &&<UserManagement users={users||[]} saveUsers={saveUsers} currentUser={currentUser}/>}
-    {settingsTab==="bank sync" &&<BankSyncPanel/>}
+    {settingsTab==="bank sync" &&<BankSyncPanel entities={entities}/>}
   </>);
 }
 
@@ -1499,58 +1789,147 @@ function CategoriesSettings({categories,setCategories}){
   </div>);
 }
 
-function BankSyncPanel(){
-  const steps=[
-    {n:1,title:"Register Intuit Developer Account",desc:"Go to developer.intuit.com → create app → choose QuickBooks Online scope. You'll get a Client ID and Client Secret.",color:C.blue},
-    {n:2,title:"OAuth 2.0 Authorization Flow",desc:"User clicks 'Connect QB' → redirect to Intuit consent screen → user approves → Intuit returns auth_code → your server exchanges it for access_token + refresh_token.",color:C.purple},
-    {n:3,title:"Store Tokens Securely",desc:"Save access_token (1hr TTL) and refresh_token (101 days) in your database, encrypted at rest. Never expose the Client Secret in the browser.",color:C.warning},
-    {n:4,title:"Pull Transactions via API",desc:'GET https://quickbooks.api.intuit.com/v3/company/{realmId}/query\n?query=SELECT * FROM Purchase WHERE TxnDate >= \'2026-01-01\'\nRepeat for: Purchase (expenses), Deposit (income), JournalEntry, Bill, Invoice.',color:C.accent},
-    {n:5,title:"Handle Token Refresh",desc:"Before each API call, check if access_token is expired. Use refresh_token to get a new one via POST to oauth2.intuit.com/oauth2/v1/tokens/bearer. Log refresh failures — the user needs to re-authorize.",color:C.teal},
-    {n:6,title:"Webhook for Real-time Updates",desc:"Register a webhook endpoint in Intuit Developer portal. QB posts a notification within minutes of any new transaction. Your server verifies the signature (HMAC-SHA256), then fetches the delta.",color:"#FF6B9D"},
-  ];
-  const libs=[
-    {name:"intuit-oauth",lang:"Node.js",desc:"Official Intuit OAuth SDK. Handles token exchange and refresh automatically.",npm:"npm install intuit-oauth"},
-    {name:"node-quickbooks",lang:"Node.js",desc:"Wrapper for QB REST API. query(), findTransactions(), getCompanyInfo().",npm:"npm install node-quickbooks"},
-    {name:"python-quickbooks",lang:"Python",desc:"Django/Flask-friendly. QuickBooks.get_items(), find_accounts().",npm:"pip install python-quickbooks"},
-    {name:"next-auth + custom provider",lang:"Next.js",desc:"If using Next.js — wrap Intuit OAuth as a custom NextAuth provider. Session stores realm_id.",npm:"npm install next-auth"},
-  ];
+function BankSyncPanel({ entities }){
+  const [connections, setConnections] = useState([]); // [{realmId, entityId, needsReauth}]
+  const [lastSync,    setLastSync]    = useState(null);
+  const [loading,     setLoading]     = useState(true);
+  const [syncing,     setSyncing]     = useState(false);
+  const [syncResult,  setSyncResult]  = useState(null);
+
+  // Load connection status on mount
+  useEffect(()=>{
+    fetch("/api/qb-status")
+      .then(r=>r.json())
+      .then(d=>{ setConnections(d.connections||[]); setLastSync(d.lastSync); })
+      .catch(()=>setConnections([]))
+      .finally(()=>setLoading(false));
+  },[]);
+
+  const isConnected = (entityId) => connections.some(c=>c.entityId===entityId&&!c.needsReauth);
+  const needsReauth = (entityId) => connections.some(c=>c.entityId===entityId&&c.needsReauth);
+
+  const connect = (entityId) => {
+    // Redirect to OAuth flow — server handles the redirect to Intuit
+    window.location.href = `/api/qb-auth?entityId=${entityId}`;
+  };
+
+  const disconnect = async (entityId) => {
+    const conn = connections.find(c=>c.entityId===entityId);
+    if (!conn) return;
+    await fetch("/api/qb-disconnect", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({realmId:conn.realmId, entityId}),
+    });
+    setConnections(prev=>prev.filter(c=>c.entityId!==entityId));
+  };
+
+  const syncNow = async () => {
+    setSyncing(true); setSyncResult(null);
+    try {
+      const res  = await fetch("/api/qb-sync", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({}) });
+      const data = await res.json();
+      setSyncResult(data);
+      setLastSync(data.syncedAt);
+    } catch(e){ setSyncResult({error: e.message}); }
+    setSyncing(false);
+  };
+
   return(<div>
-    <div style={{background:C.surface,border:`1px solid ${C.warning}44`,borderRadius:12,padding:16,marginBottom:22,display:"flex",gap:14,alignItems:"flex-start"}}>
-      <span style={{fontSize:24}}>⚡</span>
-      <div>
-        <div style={{fontWeight:700,color:C.warning,fontSize:13,marginBottom:6}}>Recommended path for your setup</div>
-        <div style={{color:C.text,fontSize:13,lineHeight:1.8}}>
-          Connect your bank accounts inside <strong style={{color:C.accent}}>QuickBooks Online → Banking → Add Account</strong>. QB pulls daily feeds from RBC, TD, BMO, and Scotiabank. Then this app calls the QB API via <strong style={{color:C.blue}}>OAuth 2.0</strong> to stream transactions into the ledger. One connection covers all 5 entities. <strong style={{color:C.accent}}>Zero extra bank credentials</strong> needed.
+    {/* Header */}
+    <div style={{background:C.surface,border:`1px solid ${C.accent}44`,borderRadius:12,padding:16,marginBottom:20,display:"flex",gap:14,alignItems:"flex-start"}}>
+      <span style={{fontSize:22}}>🔗</span>
+      <div style={{flex:1}}>
+        <div style={{fontWeight:700,color:C.accent,fontSize:13,marginBottom:4}}>QuickBooks Integration</div>
+        <div style={{color:C.textMid,fontSize:12,lineHeight:1.6}}>
+          Connect each QuickBooks company file once. After connecting, click "Sync QB" in the top bar to pull the latest transactions. Tokens auto-refresh — you only re-authorize once every ~100 days.
         </div>
       </div>
+      {connections.filter(c=>!c.needsReauth).length>0&&(
+        <button onClick={syncNow} disabled={syncing} style={{background:syncing?C.surfaceHigh:C.qb,color:syncing?C.textMid:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:syncing?"not-allowed":"pointer",whiteSpace:"nowrap",flexShrink:0}}>
+          {syncing?"Syncing…":"⬇ Sync All Now"}
+        </button>
+      )}
     </div>
 
-    <div style={{marginBottom:22}}>
-      <div style={{fontSize:11,color:C.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>Integration Steps</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-        {steps.map(s=>(
-          <div key={s.n} style={{background:C.surface,border:`1px solid ${s.color}33`,borderRadius:10,padding:"13px 14px",display:"flex",gap:12}}>
-            <div style={{width:28,height:28,borderRadius:"50%",background:s.color+"22",border:`1px solid ${s.color}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:s.color,flexShrink:0}}>{s.n}</div>
-            <div>
-              <div style={{fontWeight:700,fontSize:12,color:C.text,marginBottom:5}}>{s.title}</div>
-              <div style={{fontSize:11,color:C.textMid,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{s.desc}</div>
-            </div>
+    {/* Last sync + result */}
+    {lastSync&&<div style={{background:C.accentDim,border:`1px solid ${C.accent}33`,borderRadius:8,padding:"8px 14px",marginBottom:16,fontSize:12,color:C.accent}}>
+      ✓ Last sync: {new Date(lastSync).toLocaleString("en-CA")}
+      {syncResult&&!syncResult.error&&` — ${syncResult.totalCount} transactions pulled`}
+    </div>}
+    {syncResult?.error&&<div style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,borderRadius:8,padding:"8px 14px",marginBottom:16,fontSize:12,color:C.danger}}>✗ Sync error: {syncResult.error}</div>}
+
+    {/* Setup prerequisites */}
+    <div style={{background:C.warningDim,border:`1px solid ${C.warning}44`,borderRadius:10,padding:"12px 14px",marginBottom:20}}>
+      <div style={{fontWeight:700,color:C.warning,fontSize:12,marginBottom:8}}>⚙ Before connecting — one-time Vercel setup</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        {[
+          {label:"QB_CLIENT_ID",     desc:"From developer.intuit.com → your app → Keys & credentials"},
+          {label:"QB_CLIENT_SECRET", desc:"Same page as Client ID — never share this"},
+          {label:"QB_REDIRECT_URI",  desc:`https://${window.location.host}/api/qb-callback`},
+          {label:"KV_REST_API_URL",  desc:"From Vercel Dashboard → Storage → KV → Connect"},
+          {label:"KV_REST_API_TOKEN",desc:"Same KV page — copy the REST token"},
+        ].map(({label,desc})=>(
+          <div key={label} style={{background:C.bg,borderRadius:7,padding:"8px 10px"}}>
+            <div style={{fontFamily:"monospace",fontSize:11,color:C.warning,fontWeight:700,marginBottom:2}}>{label}</div>
+            <div style={{fontSize:10,color:C.textMid,lineHeight:1.4}}>{desc}</div>
           </div>
         ))}
       </div>
     </div>
 
-    <div>
-      <div style={{fontSize:11,color:C.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>Recommended Libraries</div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:10}}>
-        {libs.map(l=>(
-          <div key={l.name} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"13px 14px"}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><Badge color={C.blue}>{l.lang}</Badge><span style={{fontWeight:700,fontSize:13,color:C.text,fontFamily:"monospace"}}>{l.name}</span></div>
-            <div style={{fontSize:11,color:C.textMid,lineHeight:1.5,marginBottom:8}}>{l.desc}</div>
-            <div style={{background:C.bg,borderRadius:6,padding:"5px 10px",fontFamily:"monospace",fontSize:11,color:C.accent}}>{l.npm}</div>
+    {/* Entity connection list */}
+    <div style={{fontSize:11,color:C.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>Connect Your QB Companies</div>
+    {loading&&<div style={{color:C.textMid,fontSize:12,padding:"20px 0"}}>Checking connections…</div>}
+    {!loading&&(
+      <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
+        {(entities||DEFAULT_ENTITIES).map((ent,i)=>{
+          const connected  = isConnected(ent.id);
+          const reauth     = needsReauth(ent.id);
+          const conn       = connections.find(c=>c.entityId===ent.id);
+          return(
+            <div key={ent.id} style={{display:"flex",alignItems:"center",gap:14,padding:"13px 16px",borderBottom:i<(entities||DEFAULT_ENTITIES).length-1?`1px solid ${C.border}`:"none",transition:"background 0.12s"}}>
+              <div style={{width:10,height:10,borderRadius:"50%",background:connected?C.accent:reauth?C.warning:C.textDim,flexShrink:0}}/>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,color:C.text,fontWeight:600}}>{ent.name}</div>
+                <div style={{fontSize:11,color:C.textMid,marginTop:2}}>
+                  {connected ? `Connected · realmId: ${conn?.realmId||"—"}`
+                  : reauth   ? "⚠ Token expired — please reconnect"
+                  :             "Not connected"}
+                </div>
+              </div>
+              <Badge color={connected?C.accent:reauth?C.warning:C.textDim}>
+                {connected?"Connected":reauth?"Needs Reauth":"Not Connected"}
+              </Badge>
+              {connected&&!reauth?(
+                <button onClick={()=>disconnect(ent.id)} style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,color:C.danger,borderRadius:7,padding:"6px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>Disconnect</button>
+              ):(
+                <button onClick={()=>connect(ent.id)} style={{background:reauth?C.warningDim:C.accentDim,border:`1px solid ${reauth?C.warning:C.accent}44`,color:reauth?C.warning:C.accent,borderRadius:7,padding:"6px 14px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                  {reauth?"Reconnect":"Connect QB"}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    )}
+
+    {/* How it works */}
+    <div style={{marginTop:22}}>
+      <div style={{fontSize:11,color:C.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>How the sync works</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+        {[
+          {icon:"🔐",title:"OAuth 2.0",desc:"You click Connect → Intuit login → approve → token stored securely in Vercel KV. Your QB password never touches this app."},
+          {icon:"⬇",title:"Delta sync",desc:"Each sync only pulls transactions newer than the last sync date. No duplicates, no full re-pulls. Fast and efficient."},
+          {icon:"🔄",title:"Auto token refresh",desc:"Access tokens expire in 1 hour but refresh silently. Refresh tokens last 101 days — you'll get a reminder when re-auth is needed."},
+        ].map(({icon,title,desc})=>(
+          <div key={title} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"13px 14px"}}>
+            <div style={{fontSize:20,marginBottom:8}}>{icon}</div>
+            <div style={{fontWeight:700,fontSize:12,color:C.text,marginBottom:5}}>{title}</div>
+            <div style={{fontSize:11,color:C.textMid,lineHeight:1.6}}>{desc}</div>
           </div>
         ))}
       </div>
     </div>
   </div>);
 }
+
