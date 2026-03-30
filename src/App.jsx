@@ -51,17 +51,17 @@ const addWeeks= (d,n) => addDays(d,n*7);
 const addMonths=(d,n) => { const x=new Date(d); x.setMonth(x.getMonth()+n); return x; };
 const parseD  = (s)  => new Date(s+"T00:00:00");
 const PALETTE = ["#4D9EFF","#00C896","#A78BFA","#F0A500","#FF6B9D","#22D3EE","#FF4D4D","#34D399","#F472B6","#60A5FA"];
+const TODAY_STR = dateStr(TODAY);
 
 // balColor: returns red if balance is below -overdraft, otherwise normal green/amber/red
 // overdraftLimit: the allowed negative buffer (e.g. 5000 means balance can go to -5000 before red)
 const balColor = (balance, overdraftLimit = 0) => {
   const floor = -(Math.abs(overdraftLimit));
-  if (balance < floor) return C.danger;          // below overdraft limit → RED
-  if (balance < 0)     return C.warning;          // negative but within overdraft → AMBER
-  if (balance < 5000)  return C.warning;          // low positive → AMBER
-  return C.accent;                                 // healthy → GREEN
+  if (balance < floor) return C.danger;
+  if (balance < 0)     return C.warning;
+  if (balance < 5000)  return C.warning;
+  return C.accent;
 };
-const TODAY_STR = dateStr(TODAY);
 
 function expandRecurring(proj) {
   if (proj.recurrence==="once") return [{...proj, occDate:proj.startDate, occId:proj.id+"_0"}];
@@ -594,20 +594,21 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
 
   // Detect QB OAuth callback redirect (?qb_connected=entityId)
   useEffect(()=>{
-    const params = new URLSearchParams(window.location.search);
-    const connected = params.get("qb_connected");
-    const qbError   = params.get("qb_error");
-    if (connected) {
-      const ent = entities.find(e=>e.id===connected);
-      setQbConnectMsg({ type:"success", msg:`✓ QuickBooks connected for ${ent?.name||connected}! You can now sync transactions.` });
-      window.history.replaceState({}, "", window.location.pathname);
-      setTab("settings"); setSettingsTab("bank sync");
-      setTimeout(()=>setQbConnectMsg(null), 6000);
-    } else if (qbError) {
-      setQbConnectMsg({ type:"error", msg:`QB connection failed: ${qbError}` });
-      window.history.replaceState({}, "", window.location.pathname);
-      setTimeout(()=>setQbConnectMsg(null), 6000);
-    }
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const connected = params.get("qb_connected");
+      const qbError   = params.get("qb_error");
+      if (connected) {
+        setQbConnectMsg({ type:"success", msg:`✓ QuickBooks connected successfully! You can now sync transactions.` });
+        window.history.replaceState({}, "", window.location.pathname);
+        setTab("settings"); setSettingsTab("bank sync");
+        setTimeout(()=>setQbConnectMsg(null), 6000);
+      } else if (qbError) {
+        setQbConnectMsg({ type:"error", msg:`QB connection failed: ${qbError}` });
+        window.history.replaceState({}, "", window.location.pathname);
+        setTimeout(()=>setQbConnectMsg(null), 6000);
+      }
+    } catch(e){ console.warn("QB callback check failed:", e); }
   },[]);
 
   // ── Delete state ─────────────────────────────────────────────────────────
@@ -1865,7 +1866,7 @@ function BankSyncPanel({ entities }){
         {[
           {label:"QB_CLIENT_ID",     desc:"From developer.intuit.com → your app → Keys & credentials"},
           {label:"QB_CLIENT_SECRET", desc:"Same page as Client ID — never share this"},
-          {label:"QB_REDIRECT_URI",  desc:`https://${window.location.host}/api/qb-callback`},
+          {label:"QB_REDIRECT_URI",  desc:`https://YOUR-DOMAIN.vercel.app/api/qb-callback  (replace with your actual URL)`},
           {label:"KV_REST_API_URL",  desc:"From Vercel Dashboard → Storage → KV → Connect"},
           {label:"KV_REST_API_TOKEN",desc:"Same KV page — copy the REST token"},
         ].map(({label,desc})=>(
