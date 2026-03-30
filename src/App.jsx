@@ -25,7 +25,7 @@ const DATA_KEY    = "cfp_data_v1"; // persists entities, accounts, categories, p
 // ─────────────────────────────────────────────────────────────────────────────
 // TOKENS
 // ─────────────────────────────────────────────────────────────────────────────
-const C = {
+const COLORS = {
   bg:"#0A0E14", surface:"#111820", surfaceHigh:"#182030",
   border:"#1E2D40", borderMid:"#2A3D55",
   accent:"#00C896", accentDim:"#002E22",
@@ -80,24 +80,24 @@ function expandRecurring(proj) {
 // SEED DATA
 // ─────────────────────────────────────────────────────────────────────────────
 const DEFAULT_CATEGORIES = [
-  {id:"cat1",name:"Revenue",     type:"income",  color:C.accent },
-  {id:"cat2",name:"Membership",  type:"income",  color:C.blue   },
-  {id:"cat3",name:"Retail",      type:"income",  color:C.teal   },
-  {id:"cat4",name:"Other Income",type:"income",  color:C.purple },
-  {id:"cat5",name:"Payroll",     type:"expense", color:C.danger },
-  {id:"cat6",name:"Marketing",   type:"expense", color:C.warning},
+  {id:"cat1",name:"Revenue",     type:"income",  color:COLORS.accent },
+  {id:"cat2",name:"Membership",  type:"income",  color:COLORS.blue   },
+  {id:"cat3",name:"Retail",      type:"income",  color:COLORS.teal   },
+  {id:"cat4",name:"Other Income",type:"income",  color:COLORS.purple },
+  {id:"cat5",name:"Payroll",     type:"expense", color:COLORS.danger },
+  {id:"cat6",name:"Marketing",   type:"expense", color:COLORS.warning},
   {id:"cat7",name:"Inventory",   type:"expense", color:"#FF6B9D"},
   {id:"cat8",name:"Rent",        type:"expense", color:"#F472B6"},
   {id:"cat9",name:"Software",    type:"expense", color:"#60A5FA"},
   {id:"cat10",name:"Utilities",  type:"expense", color:"#34D399"},
   {id:"cat11",name:"Tax",        type:"expense", color:"#F97316"},
-  {id:"cat12",name:"Other",      type:"expense", color:C.textMid},
+  {id:"cat12",name:"Other",      type:"expense", color:COLORS.textMid},
 ];
 const DEFAULT_ENTITIES = [
-  {id:"cml", name:"Canada MedLaser Inc",         short:"CML",  color:C.blue   },
-  {id:"cmlf",name:"Canada MedLaser Franchising", short:"CMLF", color:C.purple },
-  {id:"ssb", name:"Skin Society Bar",             short:"SSB",  color:C.accent },
-  {id:"acad",name:"CML Academy",                 short:"ACAD", color:C.warning},
+  {id:"cml", name:"Canada MedLaser Inc",         short:"CML",  color:COLORS.blue   },
+  {id:"cmlf",name:"Canada MedLaser Franchising", short:"CMLF", color:COLORS.purple },
+  {id:"ssb", name:"Skin Society Bar",             short:"SSB",  color:COLORS.accent },
+  {id:"acad",name:"CML Academy",                 short:"ACAD", color:COLORS.warning},
   {id:"yeco",name:"YECO Marketing",              short:"YECO", color:"#FF6B9D"},
 ];
 const DEFAULT_ACCOUNTS = [
@@ -465,14 +465,14 @@ function UserManagement({ users, saveUsers, currentUser }) {
     setTimeout(()=>setResetMsg(null),4000);
   };
 
-  const ROLE_COLORS = { admin:C.accent, viewer:C.blue };
+  const ROLE_COLORS = { admin:COLORS.accent, viewer:COLORS.blue };
   const ROLE_LABELS = { admin:"Admin — full access", viewer:"Viewer — read only" };
 
   return (
     <div>
       {/* Form */}
-      <div style={{background:C.surface,border:`1px solid ${editId?C.blue+"55":C.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
-        <div style={{fontSize:12,fontWeight:700,color:editId?C.blue:C.accent,marginBottom:14}}>{editId?"✏ Edit User":"＋ Add User"}</div>
+      <div style={{background:COLORS.surface,border:`1px solid ${editId?COLORS.blue+"55":COLORS.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
+        <div style={{fontSize:12,fontWeight:700,color:editId?COLORS.blue:COLORS.accent,marginBottom:14}}>{editId?"✏ Edit User":"＋ Add User"}</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 100px",gap:10,alignItems:"end"}}>
           <Fld label="Full Name"><input style={inpS()} placeholder="Jane Smith" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
           <Fld label="Email"><input style={inpS()} type="email" placeholder="jane@company.ca" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))}/></Fld>
@@ -483,41 +483,41 @@ function UserManagement({ users, saveUsers, currentUser }) {
             </select>
           </Fld>
           <div style={{display:"flex",gap:7,alignItems:"flex-end"}}>
-            <button onClick={save} style={{flex:1,background:editId?C.blue:C.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>
-            {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}
+            <button onClick={save} style={{flex:1,background:editId?COLORS.blue:COLORS.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>
+            {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}
           </div>
         </div>
       </div>
 
-      {resetMsg&&<div style={{background:C.accentDim,border:`1px solid ${C.accent}33`,borderRadius:8,padding:"9px 14px",marginBottom:14,fontSize:12,color:C.accent}}>✓ {resetMsg}</div>}
+      {resetMsg&&<div style={{background:COLORS.accentDim,border:`1px solid ${COLORS.accent}33`,borderRadius:8,padding:"9px 14px",marginBottom:14,fontSize:12,color:COLORS.accent}}>✓ {resetMsg}</div>}
 
       {/* Role legend */}
-      <div style={{display:"flex",gap:16,marginBottom:14,fontSize:11,color:C.textMid}}>
-        <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:8,height:8,borderRadius:"50%",background:C.accent,display:"inline-block"}}/><span>Admin — can edit everything, manage users, delete transactions</span></div>
-        <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:8,height:8,borderRadius:"50%",background:C.blue,display:"inline-block"}}/><span>Viewer — read-only, no delete, no settings</span></div>
+      <div style={{display:"flex",gap:16,marginBottom:14,fontSize:11,color:COLORS.textMid}}>
+        <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:8,height:8,borderRadius:"50%",background:COLORS.accent,display:"inline-block"}}/><span>Admin — can edit everything, manage users, delete transactions</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:8,height:8,borderRadius:"50%",background:COLORS.blue,display:"inline-block"}}/><span>Viewer — read-only, no delete, no settings</span></div>
       </div>
 
       {/* Users table */}
-      <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
+      <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,overflow:"hidden"}}>
         <ColHdr cols="1fr 1fr 100px 120px 160px" labels={["Name","Email","Role","Status","Actions"]}/>
         {users.map(u=>(
-          <div key={u.id} className="rh" style={{display:"grid",gridTemplateColumns:"1fr 1fr 100px 120px 160px",gap:10,padding:"10px 14px",alignItems:"center",borderBottom:`1px solid ${C.border}`,transition:"background 0.12s",background:editId===u.id?C.blue+"09":"transparent"}}>
+          <div key={u.id} className="rh" style={{display:"grid",gridTemplateColumns:"1fr 1fr 100px 120px 160px",gap:10,padding:"10px 14px",alignItems:"center",borderBottom:`1px solid ${COLORS.border}`,transition:"background 0.12s",background:editId===u.id?COLORS.blue+"09":"transparent"}}>
             <div style={{display:"flex",alignItems:"center",gap:9}}>
               <div style={{width:30,height:30,borderRadius:"50%",background:ROLE_COLORS[u.role]+"22",border:`1px solid ${ROLE_COLORS[u.role]}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:ROLE_COLORS[u.role],flexShrink:0}}>
                 {u.name.charAt(0).toUpperCase()}
               </div>
               <div>
-                <div style={{fontSize:13,color:C.text,fontWeight:600}}>{u.name}</div>
-                {u.id===currentUser.id&&<div style={{fontSize:10,color:C.accent}}>You</div>}
+                <div style={{fontSize:13,color:COLORS.text,fontWeight:600}}>{u.name}</div>
+                {u.id===currentUser.id&&<div style={{fontSize:10,color:COLORS.accent}}>You</div>}
               </div>
             </div>
-            <span style={{fontSize:12,color:C.textMid,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</span>
+            <span style={{fontSize:12,color:COLORS.textMid,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</span>
             <span style={{fontSize:10,fontWeight:700,letterSpacing:"0.07em",textTransform:"uppercase",padding:"2px 8px",borderRadius:99,background:ROLE_COLORS[u.role]+"22",color:ROLE_COLORS[u.role],border:`1px solid ${ROLE_COLORS[u.role]}33`}}>{u.role}</span>
             <span style={{fontSize:11}}>{u.hash?"🔒 Password set":"⚪ No password yet"}</span>
             <div style={{display:"flex",gap:5}}>
-              <button onClick={()=>startEdit(u)} style={{background:C.blueDim,border:`1px solid ${C.blue}33`,color:C.blue,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button>
-              <button onClick={()=>resetPassword(u.id)} title="Force password reset on next login" style={{background:C.warningDim,border:`1px solid ${C.warning}33`,color:C.warning,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Reset PW</button>
-              {u.id!==currentUser.id&&<button onClick={()=>del(u.id)} style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,color:C.danger,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button>}
+              <button onClick={()=>startEdit(u)} style={{background:COLORS.blueDim,border:`1px solid ${COLORS.blue}33`,color:COLORS.blue,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button>
+              <button onClick={()=>resetPassword(u.id)} title="Force password reset on next login" style={{background:COLORS.warningDim,border:`1px solid ${COLORS.warning}33`,color:COLORS.warning,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Reset PW</button>
+              {u.id!==currentUser.id&&<button onClick={()=>del(u.id)} style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,color:COLORS.danger,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button>}
             </div>
           </div>
         ))}
@@ -829,56 +829,56 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
   const TABS=["dashboard","transactions","projections","cashflow","settings"];
 
   return (
-    <div style={{minHeight:"100vh",background:C.bg,color:C.text,fontFamily:"'DM Sans',system-ui,sans-serif",fontSize:14}}>
+    <div style={{minHeight:"100vh",background:COLORS.bg,color:COLORS.text,fontFamily:"'DM Sans',system-ui,sans-serif",fontSize:14}}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700;800&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
-        ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:${C.surface}}::-webkit-scrollbar-thumb{background:${C.border};border-radius:3px}
-        input,select{outline:none}input::placeholder{color:${C.textDim}}
+        ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:${COLORS.surface}}::-webkit-scrollbar-thumb{background:${COLORS.border};border-radius:3px}
+        input,select{outline:none}input::placeholder{color:${COLORS.textDim}}
         @keyframes spin{to{transform:rotate(360deg)}}@keyframes fadein{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-        .rh:hover{background:${C.surfaceHigh} !important}.rh-today:hover{background:#1E1800 !important}
-        select option{background:${C.surface};color:${C.text}}
-        .today-row{background:${C.todayBg} !important}
+        .rh:hover{background:${COLORS.surfaceHigh} !important}.rh-today:hover{background:#1E1800 !important}
+        select option{background:${COLORS.surface};color:${COLORS.text}}
+        .today-row{background:${COLORS.todayBg} !important}
       `}</style>
 
       {/* TOP BAR */}
-      <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:"0 20px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:200}}>
+      <div style={{background:COLORS.surface,borderBottom:`1px solid ${COLORS.border}`,padding:"0 20px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:200}}>
         <div style={{display:"flex",alignItems:"center",gap:9,marginRight:16,padding:"10px 0"}}>
-          <div style={{width:30,height:30,borderRadius:8,background:`linear-gradient(135deg,${C.accent},#006644)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>💰</div>
+          <div style={{width:30,height:30,borderRadius:8,background:`linear-gradient(135deg,${COLORS.accent},#006644)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>💰</div>
           <div>
             <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:800,fontSize:14,letterSpacing:"-0.02em",lineHeight:1}}>CashFlow Pro</div>
-            <div style={{fontSize:9,color:C.textMid}}>Multi-Entity · QB Connected</div>
+            <div style={{fontSize:9,color:COLORS.textMid}}>Multi-Entity · QB Connected</div>
           </div>
         </div>
-        <span style={{fontSize:10,color:C.textDim,textTransform:"uppercase",letterSpacing:"0.08em"}}>Entity</span>
+        <span style={{fontSize:10,color:COLORS.textDim,textTransform:"uppercase",letterSpacing:"0.08em"}}>Entity</span>
         <select value={filterEntity} onChange={e=>setFilterEntity(e.target.value)} style={{...selS(),width:200,padding:"5px 9px"}}>
           <option value="all">All Entities</option>
           {entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
         </select>
-        <span style={{fontSize:10,color:C.textDim,textTransform:"uppercase",letterSpacing:"0.08em"}}>Account</span>
+        <span style={{fontSize:10,color:COLORS.textDim,textTransform:"uppercase",letterSpacing:"0.08em"}}>Account</span>
         <select value={filterAccount} onChange={e=>setFilterAccount(e.target.value)} style={{...selS(),width:195,padding:"5px 9px"}}>
           <option value="all">All Accounts</option>
           {availAccounts.map(a=><option key={a.id} value={a.id}>{a.name} {a.number}</option>)}
         </select>
         <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}>
-          {syncMsg&&<span style={{fontSize:11,color:C.accent,background:C.accentDim,padding:"4px 11px",borderRadius:6,border:`1px solid ${C.accent}33`}}>✓ {syncMsg}</span>}
-          {isAdmin&&<button onClick={handleSync} disabled={syncing} style={{background:C.qb,color:"#fff",border:"none",borderRadius:7,padding:"7px 15px",fontSize:12,fontWeight:700,cursor:syncing?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:6,opacity:syncing?0.7:1}}>
+          {syncMsg&&<span style={{fontSize:11,color:COLORS.accent,background:COLORS.accentDim,padding:"4px 11px",borderRadius:6,border:`1px solid ${COLORS.accent}33`}}>✓ {syncMsg}</span>}
+          {isAdmin&&<button onClick={handleSync} disabled={syncing} style={{background:COLORS.qb,color:"#fff",border:"none",borderRadius:7,padding:"7px 15px",fontSize:12,fontWeight:700,cursor:syncing?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:6,opacity:syncing?0.7:1}}>
             <span style={{display:"inline-block",animation:syncing?"spin 1s linear infinite":"none"}}>{syncing?"⟳":"⬇"}</span>
             {syncing?"Syncing...":"Sync QB"}
           </button>}
           {/* User avatar + logout */}
-          <div style={{display:"flex",alignItems:"center",gap:8,borderLeft:`1px solid ${C.border}`,paddingLeft:12,marginLeft:4}}>
-            <div style={{width:30,height:30,borderRadius:"50%",background:session?.user?.role==="admin"?C.accent+"22":C.blue+"22",border:`1px solid ${session?.user?.role==="admin"?C.accent+"44":C.blue+"44"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:session?.user?.role==="admin"?C.accent:C.blue}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,borderLeft:`1px solid ${COLORS.border}`,paddingLeft:12,marginLeft:4}}>
+            <div style={{width:30,height:30,borderRadius:"50%",background:session?.user?.role==="admin"?COLORS.accent+"22":COLORS.blue+"22",border:`1px solid ${session?.user?.role==="admin"?COLORS.accent+"44":COLORS.blue+"44"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:session?.user?.role==="admin"?COLORS.accent:COLORS.blue}}>
               {session?.user?.name?.charAt(0)?.toUpperCase()||"?"}
             </div>
             <div style={{lineHeight:1.2}}>
-              <div style={{fontSize:12,fontWeight:600,color:C.text}}>{session?.user?.name}</div>
-              <div style={{fontSize:9,color:session?.user?.role==="admin"?C.accent:C.blue,textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:700}}>{session?.user?.role}</div>
+              <div style={{fontSize:12,fontWeight:600,color:COLORS.text}}>{session?.user?.name}</div>
+              <div style={{fontSize:9,color:session?.user?.role==="admin"?COLORS.accent:COLORS.blue,textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:700}}>{session?.user?.role}</div>
             </div>
             <button onClick={onLogout} title="Sign out"
-              style={{background:C.surfaceHigh,border:`1px solid ${C.border}`,color:C.textMid,borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:600,marginLeft:4,transition:"all 0.15s"}}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor=C.danger+"55";e.currentTarget.style.color=C.danger;}}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.textMid;}}>
+              style={{background:COLORS.surfaceHigh,border:`1px solid ${COLORS.border}`,color:COLORS.textMid,borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:600,marginLeft:4,transition:"all 0.15s"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=COLORS.danger+"55";e.currentTarget.style.color=COLORS.danger;}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=COLORS.border;e.currentTarget.style.color=COLORS.textMid;}}>
               Sign out
             </button>
           </div>
@@ -886,22 +886,22 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
       </div>
 
       {/* NAV */}
-      <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:"0 20px",display:"flex"}}>
+      <div style={{background:COLORS.surface,borderBottom:`1px solid ${COLORS.border}`,padding:"0 20px",display:"flex"}}>
         {TABS.filter(t=>t!=="settings"||isAdmin).map(t=>(
-          <button key={t} onClick={()=>setTab(t)} style={{background:"transparent",color:tab===t?C.accent:C.textMid,border:"none",borderBottom:tab===t?`2px solid ${C.accent}`:"2px solid transparent",padding:"10px 15px",fontSize:12,fontWeight:600,cursor:"pointer",textTransform:"capitalize",letterSpacing:"0.03em",transition:"all 0.15s"}}>
+          <button key={t} onClick={()=>setTab(t)} style={{background:"transparent",color:tab===t?COLORS.accent:COLORS.textMid,border:"none",borderBottom:tab===t?`2px solid ${COLORS.accent}`:"2px solid transparent",padding:"10px 15px",fontSize:12,fontWeight:600,cursor:"pointer",textTransform:"capitalize",letterSpacing:"0.03em",transition:"all 0.15s"}}>
             {t==="settings"?"⚙ Settings":t==="cashflow"?"Chart":t.charAt(0).toUpperCase()+t.slice(1)}
           </button>
         ))}
         {/* Viewer read-only badge */}
         {!isAdmin&&<div style={{marginLeft:"auto",display:"flex",alignItems:"center",padding:"0 8px"}}>
-          <span style={{fontSize:10,color:C.blue,background:C.blueDim,border:`1px solid ${C.blue}33`,borderRadius:20,padding:"3px 10px",fontWeight:700,letterSpacing:"0.06em"}}>👁 View Only</span>
+          <span style={{fontSize:10,color:COLORS.blue,background:COLORS.blueDim,border:`1px solid ${COLORS.blue}33`,borderRadius:20,padding:"3px 10px",fontWeight:700,letterSpacing:"0.06em"}}>👁 View Only</span>
         </div>}
       </div>
 
       <div style={{maxWidth:1400,margin:"0 auto",padding:"22px 20px 60px",animation:"fadein 0.25s ease"}}>
         {/* QB connection result banner */}
         {qbConnectMsg&&(
-          <div style={{background:qbConnectMsg.type==="success"?C.accentDim:C.dangerDim,border:`1px solid ${qbConnectMsg.type==="success"?C.accent:C.danger}44`,borderRadius:10,padding:"11px 16px",marginBottom:16,fontSize:13,color:qbConnectMsg.type==="success"?C.accent:C.danger,display:"flex",alignItems:"center",gap:10}}>
+          <div style={{background:qbConnectMsg.type==="success"?COLORS.accentDim:COLORS.dangerDim,border:`1px solid ${qbConnectMsg.type==="success"?COLORS.accent:COLORS.danger}44`,borderRadius:10,padding:"11px 16px",marginBottom:16,fontSize:13,color:qbConnectMsg.type==="success"?COLORS.accent:COLORS.danger,display:"flex",alignItems:"center",gap:10}}>
             {qbConnectMsg.msg}
           </div>
         )}
@@ -912,17 +912,17 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
         {tab==="dashboard"&&(<>
           <SectionHead title="Overview" sub={entities.find(e=>e.id===filterEntity)?.name||"All entities"} />
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(155px,1fr))",gap:10,marginBottom:22}}>
-            <KpiCard label="Opening Balance"    value={fmtShort(kpi.opening)}     color={C.textMid}/>
+            <KpiCard label="Opening Balance"    value={fmtShort(kpi.opening)}     color={COLORS.textMid}/>
             <KpiCard label="Current Balance"    value={fmtShort(kpi.current)}     color={balColor(kpi.current, overdraftLimit)}/>
-            <KpiCard label="Actual In (20d)"    value={fmtShort(kpi.actualIn)}    color={C.accent}/>
-            <KpiCard label="Actual Out (20d)"   value={fmtShort(kpi.actualOut)}   color={C.danger}/>
-            <KpiCard label="Projected In"       value={fmtShort(kpi.projectedIn)} color={C.blue}/>
-            <KpiCard label="Projected Out"      value={fmtShort(kpi.projectedOut)}color={C.warning}/>
+            <KpiCard label="Actual In (20d)"    value={fmtShort(kpi.actualIn)}    color={COLORS.accent}/>
+            <KpiCard label="Actual Out (20d)"   value={fmtShort(kpi.actualOut)}   color={COLORS.danger}/>
+            <KpiCard label="Projected In"       value={fmtShort(kpi.projectedIn)} color={COLORS.blue}/>
+            <KpiCard label="Projected Out"      value={fmtShort(kpi.projectedOut)}color={COLORS.warning}/>
             <KpiCard label="Ending Balance"     value={fmtShort(kpi.ending)}      color={balColor(kpi.ending, overdraftLimit)}
               sub={kpi.minBal < -(overdraftLimit) ? `⚠ Below overdraft: ${fmtShort(kpi.minBal)}` : kpi.minBal<0?`⚠ Low: ${fmtShort(kpi.minBal)}`:null}/>
           </div>
           <div style={{marginBottom:22}}>
-            <div style={{fontSize:11,color:C.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>Entities</div>
+            <div style={{fontSize:11,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>Entities</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:10}}>
               {entities.map(ent=>{
                 const eAccs=accounts.filter(a=>a.entityId===ent.id);
@@ -930,12 +930,12 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
                 const eIn=actualTxns.filter(t=>t.entityId===ent.id&&t.type==="income").reduce((s,t)=>s+t.amount,0);
                 const eOut=actualTxns.filter(t=>t.entityId===ent.id&&t.type==="expense").reduce((s,t)=>s+t.amount,0);
                 return (
-                  <div key={ent.id} className="rh" style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,overflow:"hidden",cursor:"pointer"}} onClick={()=>{setFilterEntity(ent.id);setFilterAccount("all");}}>
+                  <div key={ent.id} className="rh" style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:10,overflow:"hidden",cursor:"pointer"}} onClick={()=>{setFilterEntity(ent.id);setFilterAccount("all");}}>
                     <div style={{height:3,background:ent.color}}/>
                     <div style={{padding:"11px 13px"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}><Dot color={ent.color} size={9}/><span style={{fontWeight:700,fontSize:12,color:ent.color}}>{ent.short}</span><span style={{fontSize:10,color:C.textDim,marginLeft:"auto"}}>{eAccs.length} acct{eAccs.length!==1?"s":""}</span></div>
-                      <div style={{fontSize:19,fontWeight:800,fontFamily:"'Space Grotesk',monospace",color:C.text,marginBottom:6}}>{fmtShort(eBal)}</div>
-                      <div style={{display:"flex",gap:12,fontSize:11}}><span style={{color:C.accent}}>+{fmtShort(eIn)}</span><span style={{color:C.danger}}>−{fmtShort(eOut)}</span></div>
+                      <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}><Dot color={ent.color} size={9}/><span style={{fontWeight:700,fontSize:12,color:ent.color}}>{ent.short}</span><span style={{fontSize:10,color:COLORS.textDim,marginLeft:"auto"}}>{eAccs.length} acct{eAccs.length!==1?"s":""}</span></div>
+                      <div style={{fontSize:19,fontWeight:800,fontFamily:"'Space Grotesk',monospace",color:COLORS.text,marginBottom:6}}>{fmtShort(eBal)}</div>
+                      <div style={{display:"flex",gap:12,fontSize:11}}><span style={{color:COLORS.accent}}>+{fmtShort(eIn)}</span><span style={{color:COLORS.danger}}>−{fmtShort(eOut)}</span></div>
                     </div>
                   </div>
                 );
@@ -953,63 +953,63 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
           {/* Confirm delete modal — in-flow overlay (position:fixed breaks in iframes) */}
           {confirmModal&&(
             <div style={{minHeight:300,background:"rgba(0,0,0,0.75)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16,padding:20}}>
-              <div style={{background:C.surface,border:`1px solid ${confirmModal.row?._status==="projected"?C.blue+"66":C.danger+"66"}`,borderRadius:14,padding:28,maxWidth:460,width:"100%"}}>
+              <div style={{background:COLORS.surface,border:`1px solid ${confirmModal.row?._status==="projected"?COLORS.blue+"66":COLORS.danger+"66"}`,borderRadius:14,padding:28,maxWidth:460,width:"100%"}}>
 
                 {/* Single actual txn */}
                 {confirmModal.mode==="single"&&confirmModal.row?._status!=="projected"&&(<>
                   <div style={{fontSize:22,marginBottom:12}}>🗑</div>
-                  <div style={{fontWeight:800,fontSize:16,color:C.text,marginBottom:10,fontFamily:"'Space Grotesk',sans-serif"}}>Delete this transaction?</div>
-                  <div style={{background:C.bg,borderRadius:8,padding:"10px 14px",marginBottom:14}}>
-                    <div style={{fontSize:13,color:C.text,fontWeight:600,marginBottom:4}}>{confirmModal.row.description}</div>
-                    <div style={{fontSize:11,color:C.textMid,display:"flex",gap:14}}>
+                  <div style={{fontWeight:800,fontSize:16,color:COLORS.text,marginBottom:10,fontFamily:"'Space Grotesk',sans-serif"}}>Delete this transaction?</div>
+                  <div style={{background:COLORS.bg,borderRadius:8,padding:"10px 14px",marginBottom:14}}>
+                    <div style={{fontSize:13,color:COLORS.text,fontWeight:600,marginBottom:4}}>{confirmModal.row.description}</div>
+                    <div style={{fontSize:11,color:COLORS.textMid,display:"flex",gap:14}}>
                       <span>{confirmModal.row._date}</span>
-                      <span style={{color:confirmModal.row.type==="income"?C.accent:C.danger,fontWeight:700}}>{confirmModal.row.type==="income"?"+":"−"}{fmtShort(confirmModal.row.amount)}</span>
+                      <span style={{color:confirmModal.row.type==="income"?COLORS.accent:COLORS.danger,fontWeight:700}}>{confirmModal.row.type==="income"?"+":"−"}{fmtShort(confirmModal.row.amount)}</span>
                       <span>QB Actual</span>
                     </div>
                   </div>
-                  <div style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,borderRadius:8,padding:"8px 12px",marginBottom:20,display:"flex",gap:8}}>
-                    <span style={{color:C.danger}}>⚠</span>
-                    <span style={{fontSize:11,color:C.danger}}>Removes from CashFlow Pro only. The transaction stays in QuickBooks.</span>
+                  <div style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,borderRadius:8,padding:"8px 12px",marginBottom:20,display:"flex",gap:8}}>
+                    <span style={{color:COLORS.danger}}>⚠</span>
+                    <span style={{fontSize:11,color:COLORS.danger}}>Removes from CashFlow Pro only. The transaction stays in QuickBooks.</span>
                   </div>
                   <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-                    <button onClick={cancelDelete} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
-                    <button onClick={confirmDelete} style={{background:C.danger,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Delete Transaction</button>
+                    <button onClick={cancelDelete} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+                    <button onClick={confirmDelete} style={{background:COLORS.danger,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Delete Transaction</button>
                   </div>
                 </>)}
 
                 {/* Single projected txn — two-option choice */}
                 {confirmModal.mode==="single"&&confirmModal.row?._status==="projected"&&(<>
                   <div style={{fontSize:22,marginBottom:12}}>📅</div>
-                  <div style={{fontWeight:800,fontSize:16,color:C.text,marginBottom:6,fontFamily:"'Space Grotesk',sans-serif"}}>Delete projected transaction</div>
-                  <div style={{background:C.bg,borderRadius:8,padding:"10px 14px",marginBottom:16}}>
-                    <div style={{fontSize:13,color:C.text,fontWeight:600,marginBottom:4}}>{confirmModal.row.description}</div>
-                    <div style={{fontSize:11,color:C.textMid,display:"flex",gap:14,flexWrap:"wrap"}}>
-                      <span style={{color:C.blue}}>{confirmModal.row._date}</span>
-                      <span style={{color:confirmModal.row.type==="income"?C.accent:C.danger,fontWeight:700}}>{confirmModal.row.type==="income"?"+":"−"}{fmtShort(confirmModal.row.amount)}</span>
-                      {confirmModal.row.recurrence!=="once"&&<span style={{color:C.purple}}>↻ {confirmModal.row.recurrence}</span>}
+                  <div style={{fontWeight:800,fontSize:16,color:COLORS.text,marginBottom:6,fontFamily:"'Space Grotesk',sans-serif"}}>Delete projected transaction</div>
+                  <div style={{background:COLORS.bg,borderRadius:8,padding:"10px 14px",marginBottom:16}}>
+                    <div style={{fontSize:13,color:COLORS.text,fontWeight:600,marginBottom:4}}>{confirmModal.row.description}</div>
+                    <div style={{fontSize:11,color:COLORS.textMid,display:"flex",gap:14,flexWrap:"wrap"}}>
+                      <span style={{color:COLORS.blue}}>{confirmModal.row._date}</span>
+                      <span style={{color:confirmModal.row.type==="income"?COLORS.accent:COLORS.danger,fontWeight:700}}>{confirmModal.row.type==="income"?"+":"−"}{fmtShort(confirmModal.row.amount)}</span>
+                      {confirmModal.row.recurrence!=="once"&&<span style={{color:COLORS.purple}}>↻ {confirmModal.row.recurrence}</span>}
                     </div>
                   </div>
-                  <div style={{fontSize:12,color:C.textMid,marginBottom:10,fontWeight:600}}>What would you like to delete?</div>
+                  <div style={{fontSize:12,color:COLORS.textMid,marginBottom:10,fontWeight:600}}>What would you like to delete?</div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
                     <div onClick={()=>setConfirmModal(m=>({...m,projMode:"occurrence"}))}
-                      style={{background:confirmModal.projMode==="occurrence"?C.blueDim:C.bg,border:`2px solid ${confirmModal.projMode==="occurrence"?C.blue:C.border}`,borderRadius:10,padding:"14px",cursor:"pointer",transition:"all 0.15s"}}>
-                      <div style={{fontSize:13,fontWeight:700,color:confirmModal.projMode==="occurrence"?C.blue:C.text,marginBottom:5}}>This date only</div>
-                      <div style={{fontSize:11,color:C.textMid,lineHeight:1.5}}>Remove just {confirmModal.row._date}. Future dates from this rule stay intact.</div>
+                      style={{background:confirmModal.projMode==="occurrence"?COLORS.blueDim:COLORS.bg,border:`2px solid ${confirmModal.projMode==="occurrence"?COLORS.blue:COLORS.border}`,borderRadius:10,padding:"14px",cursor:"pointer",transition:"all 0.15s"}}>
+                      <div style={{fontSize:13,fontWeight:700,color:confirmModal.projMode==="occurrence"?COLORS.blue:COLORS.text,marginBottom:5}}>This date only</div>
+                      <div style={{fontSize:11,color:COLORS.textMid,lineHeight:1.5}}>Remove just {confirmModal.row._date}. Future dates from this rule stay intact.</div>
                     </div>
                     <div onClick={()=>setConfirmModal(m=>({...m,projMode:"rule"}))}
-                      style={{background:confirmModal.projMode==="rule"?C.dangerDim:C.bg,border:`2px solid ${confirmModal.projMode==="rule"?C.danger:C.border}`,borderRadius:10,padding:"14px",cursor:"pointer",transition:"all 0.15s"}}>
-                      <div style={{fontSize:13,fontWeight:700,color:confirmModal.projMode==="rule"?C.danger:C.text,marginBottom:5}}>
+                      style={{background:confirmModal.projMode==="rule"?COLORS.dangerDim:COLORS.bg,border:`2px solid ${confirmModal.projMode==="rule"?COLORS.danger:COLORS.border}`,borderRadius:10,padding:"14px",cursor:"pointer",transition:"all 0.15s"}}>
+                      <div style={{fontSize:13,fontWeight:700,color:confirmModal.projMode==="rule"?COLORS.danger:COLORS.text,marginBottom:5}}>
                         {confirmModal.row.recurrence==="once"?"Delete this projection":"Entire recurring rule"}
                       </div>
-                      <div style={{fontSize:11,color:C.textMid,lineHeight:1.5}}>
+                      <div style={{fontSize:11,color:COLORS.textMid,lineHeight:1.5}}>
                         {confirmModal.row.recurrence==="once"?"Remove this one-time projection permanently.":"Delete all future occurrences of this rule."}
                       </div>
                     </div>
                   </div>
                   <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-                    <button onClick={cancelDelete} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+                    <button onClick={cancelDelete} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
                     <button onClick={confirmDelete} disabled={!confirmModal.projMode}
-                      style={{background:confirmModal.projMode==="rule"?C.danger:C.blue,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:confirmModal.projMode?"pointer":"not-allowed",opacity:confirmModal.projMode?1:0.4,transition:"all 0.15s"}}>
+                      style={{background:confirmModal.projMode==="rule"?COLORS.danger:COLORS.blue,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:confirmModal.projMode?"pointer":"not-allowed",opacity:confirmModal.projMode?1:0.4,transition:"all 0.15s"}}>
                       {!confirmModal.projMode?"Select an option":confirmModal.projMode==="occurrence"?"Remove This Date":confirmModal.row.recurrence==="once"?"Delete Projection":"Delete Entire Rule"}
                     </button>
                   </div>
@@ -1018,17 +1018,17 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
                 {/* Bulk actual */}
                 {confirmModal.mode==="bulk"&&(<>
                   <div style={{fontSize:22,marginBottom:12}}>🗑</div>
-                  <div style={{fontWeight:800,fontSize:16,color:C.text,marginBottom:10,fontFamily:"'Space Grotesk',sans-serif"}}>Delete {selectedIds.size} transaction{selectedIds.size!==1?"s":""}?</div>
-                  <div style={{background:C.bg,borderRadius:8,padding:"10px 14px",marginBottom:14}}>
-                    <div style={{fontSize:12,color:C.textMid}}>{selectedIds.size} selected transaction{selectedIds.size!==1?"s":""} will be removed from CashFlow Pro.</div>
+                  <div style={{fontWeight:800,fontSize:16,color:COLORS.text,marginBottom:10,fontFamily:"'Space Grotesk',sans-serif"}}>Delete {selectedIds.size} transaction{selectedIds.size!==1?"s":""}?</div>
+                  <div style={{background:COLORS.bg,borderRadius:8,padding:"10px 14px",marginBottom:14}}>
+                    <div style={{fontSize:12,color:COLORS.textMid}}>{selectedIds.size} selected transaction{selectedIds.size!==1?"s":""} will be removed from CashFlow Pro.</div>
                   </div>
-                  <div style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,borderRadius:8,padding:"8px 12px",marginBottom:20,display:"flex",gap:8}}>
-                    <span style={{color:C.danger}}>⚠</span>
-                    <span style={{fontSize:11,color:C.danger}}>Removes from CashFlow Pro only. Transactions stay in QuickBooks.</span>
+                  <div style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,borderRadius:8,padding:"8px 12px",marginBottom:20,display:"flex",gap:8}}>
+                    <span style={{color:COLORS.danger}}>⚠</span>
+                    <span style={{fontSize:11,color:COLORS.danger}}>Removes from CashFlow Pro only. Transactions stay in QuickBooks.</span>
                   </div>
                   <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-                    <button onClick={cancelDelete} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
-                    <button onClick={confirmDelete} style={{background:C.danger,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Delete {selectedIds.size} Transactions</button>
+                    <button onClick={cancelDelete} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+                    <button onClick={confirmDelete} style={{background:COLORS.danger,color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Delete {selectedIds.size} Transactions</button>
                   </div>
                 </>)}
 
@@ -1040,37 +1040,37 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
             <SectionHead title="Transactions" sub={`Unified ledger — actual + projected · running balance per line`}/>
             <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
               {/* Date range */}
-              <span style={{fontSize:11,color:C.textMid}}>From</span>
+              <span style={{fontSize:11,color:COLORS.textMid}}>From</span>
               <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}
                 style={{...inpS(),width:130,padding:"5px 9px"}}/>
-              <span style={{fontSize:11,color:C.textMid}}>To</span>
+              <span style={{fontSize:11,color:COLORS.textMid}}>To</span>
               <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}
                 style={{...inpS(),width:130,padding:"5px 9px"}}/>
-              {(dateFrom||dateTo)&&<button onClick={()=>{setDateFrom("");setDateTo("");}} style={{background:C.surfaceHigh,border:`1px solid ${C.border}`,color:C.textMid,borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer"}}>✕ Clear</button>}
-              <div style={{width:1,background:C.border,margin:"0 4px",height:20}}/>
+              {(dateFrom||dateTo)&&<button onClick={()=>{setDateFrom("");setDateTo("");}} style={{background:COLORS.surfaceHigh,border:`1px solid ${COLORS.border}`,color:COLORS.textMid,borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer"}}>✕ Clear</button>}
+              <div style={{width:1,background:COLORS.border,margin:"0 4px",height:20}}/>
               {["all","actual","projected"].map(f=>(
-                <button key={f} onClick={()=>{setTxnStatusFilter(f);clearSelection();}} style={{background:txnStatusFilter===f?(f==="actual"?C.accentDim:f==="projected"?C.blueDim:C.surfaceHigh):"transparent",color:txnStatusFilter===f?(f==="actual"?C.accent:f==="projected"?C.blue:C.text):C.textMid,border:`1px solid ${txnStatusFilter===f?(f==="actual"?C.accent+"44":f==="projected"?C.blue+"44":C.border):C.border}`,borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"capitalize"}}>{f==="all"?"All":f==="actual"?"Actual (QB)":"Projected"}</button>
+                <button key={f} onClick={()=>{setTxnStatusFilter(f);clearSelection();}} style={{background:txnStatusFilter===f?(f==="actual"?COLORS.accentDim:f==="projected"?COLORS.blueDim:COLORS.surfaceHigh):"transparent",color:txnStatusFilter===f?(f==="actual"?COLORS.accent:f==="projected"?COLORS.blue:COLORS.text):COLORS.textMid,border:`1px solid ${txnStatusFilter===f?(f==="actual"?COLORS.accent+"44":f==="projected"?COLORS.blue+"44":COLORS.border):COLORS.border}`,borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"capitalize"}}>{f==="all"?"All":f==="actual"?"Actual (QB)":"Projected"}</button>
               ))}
-              <div style={{width:1,background:C.border,margin:"0 4px",height:20}}/>
+              <div style={{width:1,background:COLORS.border,margin:"0 4px",height:20}}/>
               {["all","income","expense"].map(f=>(
-                <button key={f} onClick={()=>setTxnTypeFilter(f)} style={{background:txnTypeFilter===f?(f==="income"?C.accentDim:f==="expense"?C.dangerDim:C.surfaceHigh):"transparent",color:txnTypeFilter===f?(f==="income"?C.accent:f==="expense"?C.danger:C.text):C.textMid,border:`1px solid ${txnTypeFilter===f?(f==="income"?C.accent+"44":f==="expense"?C.danger+"44":C.border):C.border}`,borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"capitalize"}}>{f}</button>
+                <button key={f} onClick={()=>setTxnTypeFilter(f)} style={{background:txnTypeFilter===f?(f==="income"?COLORS.accentDim:f==="expense"?COLORS.dangerDim:COLORS.surfaceHigh):"transparent",color:txnTypeFilter===f?(f==="income"?COLORS.accent:f==="expense"?COLORS.danger:COLORS.text):COLORS.textMid,border:`1px solid ${txnTypeFilter===f?(f==="income"?COLORS.accent+"44":f==="expense"?COLORS.danger+"44":COLORS.border):COLORS.border}`,borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"capitalize"}}>{f}</button>
               ))}
             </div>
           </div>
 
           {/* Bulk action bar — appears when rows are selected */}
           {selectedIds.size>0&&(
-            <div style={{background:"#1A0A0A",border:`1px solid ${C.danger}55`,borderRadius:10,padding:"10px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:14,animation:"fadein 0.2s ease"}}>
-              <div style={{width:8,height:8,borderRadius:"50%",background:C.danger}}/>
-              <span style={{fontSize:13,fontWeight:700,color:C.text}}>{selectedIds.size} transaction{selectedIds.size!==1?"s":""} selected</span>
-              <span style={{fontSize:12,color:C.textMid}}>
+            <div style={{background:"#1A0A0A",border:`1px solid ${COLORS.danger}55`,borderRadius:10,padding:"10px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:14,animation:"fadein 0.2s ease"}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:COLORS.danger}}/>
+              <span style={{fontSize:13,fontWeight:700,color:COLORS.text}}>{selectedIds.size} transaction{selectedIds.size!==1?"s":""} selected</span>
+              <span style={{fontSize:12,color:COLORS.textMid}}>
                 Total: {fmtShort(
                   displayLedger.filter(r=>r._status==="actual"&&selectedIds.has(r.id)).reduce((s,r)=>s+(r.type==="income"?r.amount:-r.amount),0)
                 )}
               </span>
               <div style={{marginLeft:"auto",display:"flex",gap:8}}>
-                <button onClick={clearSelection} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"6px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>Deselect all</button>
-                <button onClick={askDeleteBulk} style={{background:C.danger,color:"#fff",border:"none",borderRadius:7,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+                <button onClick={clearSelection} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"6px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>Deselect all</button>
+                <button onClick={askDeleteBulk} style={{background:COLORS.danger,color:"#fff",border:"none",borderRadius:7,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
                   🗑 Delete {selectedIds.size} selected
                 </button>
               </div>
@@ -1078,12 +1078,12 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
           )}
 
           {/* Legend */}
-          <div style={{display:"flex",gap:16,marginBottom:10,fontSize:11,color:C.textMid,alignItems:"center",flexWrap:"wrap"}}>
-            <span style={{fontWeight:700,color:C.textDim,textTransform:"uppercase",letterSpacing:"0.08em",fontSize:10}}>Legend:</span>
-            <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:10,height:10,borderRadius:2,background:C.accent+"33",border:`1px solid ${C.accent}55`}}/><span>Actual (QB synced)</span></div>
-            <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:10,height:10,borderRadius:2,background:C.blue+"33",border:`1px dashed ${C.blue}77`}}/><span>Projected (future)</span></div>
-            <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:10,height:2,background:C.warning,borderRadius:1}}/><span>Today divider</span></div>
-            <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:14,height:14,borderRadius:3,background:"transparent",border:`1.5px solid ${C.border}`}}/><span>Checkbox — select to bulk delete</span></div>
+          <div style={{display:"flex",gap:16,marginBottom:10,fontSize:11,color:COLORS.textMid,alignItems:"center",flexWrap:"wrap"}}>
+            <span style={{fontWeight:700,color:COLORS.textDim,textTransform:"uppercase",letterSpacing:"0.08em",fontSize:10}}>Legend:</span>
+            <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:10,height:10,borderRadius:2,background:COLORS.accent+"33",border:`1px solid ${COLORS.accent}55`}}/><span>Actual (QB synced)</span></div>
+            <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:10,height:10,borderRadius:2,background:COLORS.blue+"33",border:`1px dashed ${COLORS.blue}77`}}/><span>Projected (future)</span></div>
+            <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:10,height:2,background:COLORS.warning,borderRadius:1}}/><span>Today divider</span></div>
+            <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:14,height:14,borderRadius:3,background:"transparent",border:`1.5px solid ${COLORS.border}`}}/><span>Checkbox — select to bulk delete</span></div>
           </div>
 
           <UnifiedLedgerTable
@@ -1096,12 +1096,12 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
           />
 
           {/* Totals bar */}
-          <div style={{background:C.surface,border:`1px solid ${C.border}`,borderTop:"none",borderRadius:"0 0 12px 12px",padding:"10px 14px",display:"flex",gap:20,fontSize:12,flexWrap:"wrap"}}>
-            <span style={{color:C.textMid}}>{displayLedger.length} rows</span>
-            <span style={{color:C.accent}}>Actual in: +{fmtShort(displayLedger.filter(r=>r._status==="actual"&&r.type==="income").reduce((s,r)=>s+r.amount,0))}</span>
-            <span style={{color:C.danger}}>Actual out: −{fmtShort(displayLedger.filter(r=>r._status==="actual"&&r.type==="expense").reduce((s,r)=>s+r.amount,0))}</span>
-            <span style={{color:C.blue}}>Projected in: +{fmtShort(displayLedger.filter(r=>r._status==="projected"&&r.type==="income").reduce((s,r)=>s+r.amount,0))}</span>
-            <span style={{color:C.warning}}>Projected out: −{fmtShort(displayLedger.filter(r=>r._status==="projected"&&r.type==="expense").reduce((s,r)=>s+r.amount,0))}</span>
+          <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderTop:"none",borderRadius:"0 0 12px 12px",padding:"10px 14px",display:"flex",gap:20,fontSize:12,flexWrap:"wrap"}}>
+            <span style={{color:COLORS.textMid}}>{displayLedger.length} rows</span>
+            <span style={{color:COLORS.accent}}>Actual in: +{fmtShort(displayLedger.filter(r=>r._status==="actual"&&r.type==="income").reduce((s,r)=>s+r.amount,0))}</span>
+            <span style={{color:COLORS.danger}}>Actual out: −{fmtShort(displayLedger.filter(r=>r._status==="actual"&&r.type==="expense").reduce((s,r)=>s+r.amount,0))}</span>
+            <span style={{color:COLORS.blue}}>Projected in: +{fmtShort(displayLedger.filter(r=>r._status==="projected"&&r.type==="income").reduce((s,r)=>s+r.amount,0))}</span>
+            <span style={{color:COLORS.warning}}>Projected out: −{fmtShort(displayLedger.filter(r=>r._status==="projected"&&r.type==="expense").reduce((s,r)=>s+r.amount,0))}</span>
           </div>
         </>)}
 
@@ -1118,15 +1118,15 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
         ══════════════════════════════════════════════════════════════════ */}
         {tab==="cashflow"&&(<>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,flexWrap:"wrap",gap:10}}>
-            <div style={{display:"flex",gap:0,borderBottom:`2px solid ${C.border}`}}>
+            <div style={{display:"flex",gap:0,borderBottom:`2px solid ${COLORS.border}`}}>
               {[{k:"line",l:"Cashflow Chart"},{k:"monthly",l:"Monthly by Category"}].map(({k,l})=>(
-                <button key={k} onClick={()=>setChartSubTab(k)} style={{background:"transparent",color:chartSubTab===k?C.accent:C.textMid,border:"none",borderBottom:chartSubTab===k?`2px solid ${C.accent}`:"2px solid transparent",marginBottom:-2,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:"pointer",letterSpacing:"0.02em",transition:"all 0.15s"}}>{l}</button>
+                <button key={k} onClick={()=>setChartSubTab(k)} style={{background:"transparent",color:chartSubTab===k?COLORS.accent:COLORS.textMid,border:"none",borderBottom:chartSubTab===k?`2px solid ${COLORS.accent}`:"2px solid transparent",marginBottom:-2,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:"pointer",letterSpacing:"0.02em",transition:"all 0.15s"}}>{l}</button>
               ))}
             </div>
             {chartSubTab==="line"&&<div style={{display:"flex",gap:6,alignItems:"center"}}>
-              <span style={{fontSize:11,color:C.textMid}}>Horizon:</span>
+              <span style={{fontSize:11,color:COLORS.textMid}}>Horizon:</span>
               {[14,30,60,90].map(d=>(
-                <button key={d} onClick={()=>setForecastDays(d)} style={{background:forecastDays===d?C.accentDim:"transparent",color:forecastDays===d?C.accent:C.textMid,border:`1px solid ${forecastDays===d?C.accent+"44":C.border}`,borderRadius:6,padding:"5px 11px",fontSize:11,fontWeight:700,cursor:"pointer"}}>{d}d</button>
+                <button key={d} onClick={()=>setForecastDays(d)} style={{background:forecastDays===d?COLORS.accentDim:"transparent",color:forecastDays===d?COLORS.accent:COLORS.textMid,border:`1px solid ${forecastDays===d?COLORS.accent+"44":COLORS.border}`,borderRadius:6,padding:"5px 11px",fontSize:11,fontWeight:700,cursor:"pointer"}}>{d}d</button>
               ))}
             </div>}
           </div>
@@ -1139,7 +1139,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
           {/* Line chart section */}
           {chartSubTab==="line"&&(<>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:18}}>
-            <KpiCard label="Opening Balance"  value={fmtShort(kpi.opening)} color={C.textMid}/>
+            <KpiCard label="Opening Balance"  value={fmtShort(kpi.opening)} color={COLORS.textMid}/>
             <KpiCard label="Current Balance"  value={fmtShort(kpi.current)} color={balColor(kpi.current, overdraftLimit)}/>
             <KpiCard label={`Ending (+${forecastDays}d)`} value={fmtShort(kpi.ending)} color={balColor(kpi.ending, overdraftLimit)}/>
             <KpiCard label="Lowest Point"     value={fmtShort(kpi.minBal)} color={balColor(kpi.minBal, overdraftLimit)}
@@ -1147,34 +1147,34 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
           </div>
 
           {/* SVG Chart */}
-          <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:"18px 16px 12px",marginBottom:18,overflowX:"auto"}}>
+          <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,padding:"18px 16px 12px",marginBottom:18,overflowX:"auto"}}>
             <svg width={W} height={H+16} viewBox={`0 0 ${W} ${H+16}`} style={{display:"block",minWidth:W}}>
               <defs>
-                <linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.accent} stopOpacity=".3"/><stop offset="100%" stopColor={C.accent} stopOpacity=".02"/></linearGradient>
-                <linearGradient id="gp" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.blue} stopOpacity=".25"/><stop offset="100%" stopColor={C.blue} stopOpacity=".02"/></linearGradient>
+                <linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={COLORS.accent} stopOpacity=".3"/><stop offset="100%" stopColor={COLORS.accent} stopOpacity=".02"/></linearGradient>
+                <linearGradient id="gp" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={COLORS.blue} stopOpacity=".25"/><stop offset="100%" stopColor={COLORS.blue} stopOpacity=".02"/></linearGradient>
               </defs>
 
               {/* Y grid */}
               {[0,.25,.5,.75,1].map(p=>{
                 const v=cMin+p*cRange, y=toY(v);
-                return <g key={p}><line x1={44} y1={y} x2={W-10} y2={y} stroke={C.border} strokeDasharray="2,5"/><text x={40} y={y+4} textAnchor="end" fontSize={8} fill={C.textDim}>{fmtShort(v).replace("CA","").replace(",000","k")}</text></g>;
+                return <g key={p}><line x1={44} y1={y} x2={W-10} y2={y} stroke={COLORS.border} strokeDasharray="2,5"/><text x={40} y={y+4} textAnchor="end" fontSize={8} fill={COLORS.textDim}>{fmtShort(v).replace("CA","").replace(",000","k")}</text></g>;
               })}
-              {cMin<0&&<line x1={44} y1={toY(0)} x2={W-10} y2={toY(0)} stroke={C.warning} strokeWidth={1} strokeDasharray="3,3"/>}
+              {cMin<0&&<line x1={44} y1={toY(0)} x2={W-10} y2={toY(0)} stroke={COLORS.warning} strokeWidth={1} strokeDasharray="3,3"/>}
               {/* Overdraft floor line */}
               {overdraftLimit>0&&(()=>{
                 const floorVal = -overdraftLimit;
                 if(floorVal < cMin || floorVal > cMax) return null;
                 const y = toY(floorVal);
                 return <g>
-                  <line x1={44} y1={y} x2={W-10} y2={y} stroke={C.danger} strokeWidth={1.5} strokeDasharray="6,3"/>
-                  <text x={W-12} y={y-4} textAnchor="end" fontSize={8} fill={C.danger} fontWeight="bold">Overdraft limit</text>
+                  <line x1={44} y1={y} x2={W-10} y2={y} stroke={COLORS.danger} strokeWidth={1.5} strokeDasharray="6,3"/>
+                  <text x={W-12} y={y-4} textAnchor="end" fontSize={8} fill={COLORS.danger} fontWeight="bold">Overdraft limit</text>
                 </g>;
               })()}
 
               {/* TODAY shaded band */}
               {todayIdx>=0&&(()=>{
                 const x=toX(todayIdx);
-                return <><rect x={x-1} y={10} width={3} height={H-30} fill={C.warning} opacity={0.9} rx={1}/><text x={x} y={H+14} textAnchor="middle" fontSize={8} fill={C.warning} fontWeight="bold">TODAY</text></>;
+                return <><rect x={x-1} y={10} width={3} height={H-30} fill={COLORS.warning} opacity={0.9} rx={1}/><text x={x} y={H+14} textAnchor="middle" fontSize={8} fill={COLORS.warning} fontWeight="bold">TODAY</text></>;
               })()}
 
               {/* Actual area */}
@@ -1183,7 +1183,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
                 if(actPts.length<2) return null;
                 const line=actPts.map((d,i)=>`${i===0?"M":"L"}${toX(chartData.indexOf(d))},${toY(d.balance)}`).join(" ");
                 const fi=chartData.indexOf(actPts[0]), li=chartData.indexOf(actPts[actPts.length-1]);
-                return <><path d={line+` L${toX(li)},${H-20} L${toX(fi)},${H-20} Z`} fill="url(#ga)"/><path d={line} fill="none" stroke={C.accent} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"/></>;
+                return <><path d={line+` L${toX(li)},${H-20} L${toX(fi)},${H-20} Z`} fill="url(#ga)"/><path d={line} fill="none" stroke={COLORS.accent} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"/></>;
               })()}
 
               {/* Projected area */}
@@ -1192,34 +1192,34 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
                 if(pPts.length<2) return null;
                 const line=pPts.map((d,i)=>`${i===0?"M":"L"}${toX(chartData.indexOf(d))},${toY(d.balance)}`).join(" ");
                 const fi=chartData.indexOf(pPts[0]), li=chartData.indexOf(pPts[pPts.length-1]);
-                return <><path d={line+` L${toX(li)},${H-20} L${toX(fi)},${H-20} Z`} fill="url(#gp)"/><path d={line} fill="none" stroke={C.blue} strokeWidth={2} strokeDasharray="5,3" strokeLinecap="round" strokeLinejoin="round"/></>;
+                return <><path d={line+` L${toX(li)},${H-20} L${toX(fi)},${H-20} Z`} fill="url(#gp)"/><path d={line} fill="none" stroke={COLORS.blue} strokeWidth={2} strokeDasharray="5,3" strokeLinecap="round" strokeLinejoin="round"/></>;
               })()}
 
               {/* Dots */}
               {chartData.map((d,i)=>{
                 if(!d.hasActivity&&!d.isToday) return null;
                 const x=toX(i),y=toY(d.balance);
-                if(d.isToday) return <circle key={i} cx={x} cy={y} r={5} fill={C.warning} stroke={C.bg} strokeWidth={2}/>;
-                const dotColor = d.balance < -(overdraftLimit) ? C.danger : d.isProjected ? C.blue : C.accent;
-                return <circle key={i} cx={x} cy={y} r={3} fill={dotColor} stroke={C.bg} strokeWidth={1.5}/>;
+                if(d.isToday) return <circle key={i} cx={x} cy={y} r={5} fill={COLORS.warning} stroke={COLORS.bg} strokeWidth={2}/>;
+                const dotColor = d.balance < -(overdraftLimit) ? COLORS.danger : d.isProjected ? COLORS.blue : COLORS.accent;
+                return <circle key={i} cx={x} cy={y} r={3} fill={dotColor} stroke={COLORS.bg} strokeWidth={1.5}/>;
               })}
 
               {/* X labels */}
               {chartData.map((d,i)=>{
                 if(i%7!==0&&!d.isToday) return null;
-                return <text key={i} x={toX(i)} y={H+14} textAnchor="middle" fontSize={7} fill={d.isToday?C.warning:C.textDim}>{d.date.slice(5)}</text>;
+                return <text key={i} x={toX(i)} y={H+14} textAnchor="middle" fontSize={7} fill={d.isToday?COLORS.warning:COLORS.textDim}>{d.date.slice(5)}</text>;
               })}
             </svg>
             <div style={{display:"flex",gap:18,marginTop:8,paddingLeft:44,flexWrap:"wrap"}}>
               {[
-                {c:C.accent,l:"Actual balance"},
-                {c:C.blue,l:"Projected",dash:true},
-                {c:C.warning,l:"Today"},
-                ...(overdraftLimit>0?[{c:C.danger,l:`Overdraft limit (${fmtShort(overdraftLimit)})`,dash:true}]:[]),
+                {c:COLORS.accent,l:"Actual balance"},
+                {c:COLORS.blue,l:"Projected",dash:true},
+                {c:COLORS.warning,l:"Today"},
+                ...(overdraftLimit>0?[{c:COLORS.danger,l:`Overdraft limit (${fmtShort(overdraftLimit)})`,dash:true}]:[]),
               ].map(({c,l,dash})=>(
                 <div key={l} style={{display:"flex",alignItems:"center",gap:5}}>
                   <div style={{width:16,height:2,background:dash?"transparent":c,backgroundImage:dash?`repeating-linear-gradient(90deg,${c},${c} 4px,transparent 4px,transparent 7px)`:"none"}}/>
-                  <span style={{fontSize:10,color:C.textMid}}>{l}</span>
+                  <span style={{fontSize:10,color:COLORS.textMid}}>{l}</span>
                 </div>
               ))}
             </div>
@@ -1298,21 +1298,21 @@ function MonthlyCategoryReport({ actualTxns, categories, entities, filterEntity 
     <div style={{ animation: "fadein 0.25s ease" }}>
       {/* Controls */}
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 11, color: C.textMid }}>Show:</span>
+        <span style={{ fontSize: 11, color: COLORS.textMid }}>Show:</span>
         {[{ k: "both", l: "Income & Expense" }, { k: "income", l: "Income only" }, { k: "expense", l: "Expense only" }].map(({ k, l }) => (
-          <button key={k} onClick={() => setReportType(k)} style={{ background: reportType === k ? C.accentDim : "transparent", color: reportType === k ? C.accent : C.textMid, border: `1px solid ${reportType === k ? C.accent + "44" : C.border}`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{l}</button>
+          <button key={k} onClick={() => setReportType(k)} style={{ background: reportType === k ? COLORS.accentDim : "transparent", color: reportType === k ? COLORS.accent : COLORS.textMid, border: `1px solid ${reportType === k ? COLORS.accent + "44" : COLORS.border}`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{l}</button>
         ))}
-        <div style={{ width: 1, background: C.border, height: 18 }} />
-        <span style={{ fontSize: 11, color: C.textMid }}>Months:</span>
+        <div style={{ width: 1, background: COLORS.border, height: 18 }} />
+        <span style={{ fontSize: 11, color: COLORS.textMid }}>Months:</span>
         {[3, 6, 12].map(m => (
-          <button key={m} onClick={() => setMonths(m)} style={{ background: months === m ? C.blueDim : "transparent", color: months === m ? C.blue : C.textMid, border: `1px solid ${months === m ? C.blue + "44" : C.border}`, borderRadius: 6, padding: "5px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{m}mo</button>
+          <button key={m} onClick={() => setMonths(m)} style={{ background: months === m ? COLORS.blueDim : "transparent", color: months === m ? COLORS.blue : COLORS.textMid, border: `1px solid ${months === m ? COLORS.blue + "44" : COLORS.border}`, borderRadius: 6, padding: "5px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{m}mo</button>
         ))}
       </div>
 
       {/* Table */}
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "auto" }}>
+      <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "auto" }}>
         {/* Header row */}
-        <div style={{ display: "grid", gridTemplateColumns: `180px repeat(${monthList.length}, 1fr) 110px`, gap: 0, background: "#161E2A", borderBottom: `1px solid ${C.border}`, minWidth: 500 }}>
+        <div style={{ display: "grid", gridTemplateColumns: `180px repeat(${monthList.length}, 1fr) 110px`, gap: 0, background: "#161E2A", borderBottom: `1px solid ${COLORS.border}`, minWidth: 500 }}>
           <div style={{ padding: "8px 14px", fontSize: 10, color: "#7A96B0", textTransform: "uppercase", letterSpacing: "0.09em", fontWeight: 600 }}>Category</div>
           {monthList.map(m => (
             <div key={m.key} style={{ padding: "8px 8px", fontSize: 10, color: "#7A96B0", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, textAlign: "right" }}>{m.label}</div>
@@ -1323,12 +1323,12 @@ function MonthlyCategoryReport({ actualTxns, categories, entities, filterEntity 
         {data.length === 0 && <Empty msg="No transaction data for the selected period." />}
 
         {data.map(({ cat, monthly, total }) => (
-          <div key={cat.id} className="rh" style={{ display: "grid", gridTemplateColumns: `180px repeat(${monthList.length}, 1fr) 110px`, gap: 0, borderBottom: `1px solid ${C.border}`, minWidth: 500, transition: "background 0.12s" }}>
+          <div key={cat.id} className="rh" style={{ display: "grid", gridTemplateColumns: `180px repeat(${monthList.length}, 1fr) 110px`, gap: 0, borderBottom: `1px solid ${COLORS.border}`, minWidth: 500, transition: "background 0.12s" }}>
             {/* Category name */}
             <div style={{ padding: "9px 14px", display: "flex", alignItems: "center", gap: 7 }}>
               <Dot color={cat.color} size={7} />
-              <span style={{ fontSize: 12, color: C.text, fontWeight: 500 }}>{cat.name}</span>
-              <span style={{ fontSize: 9, color: cat.type === "income" ? C.accent : C.danger, textTransform: "uppercase", fontWeight: 700 }}>{cat.type === "income" ? "▲" : "▼"}</span>
+              <span style={{ fontSize: 12, color: COLORS.text, fontWeight: 500 }}>{cat.name}</span>
+              <span style={{ fontSize: 9, color: cat.type === "income" ? COLORS.accent : COLORS.danger, textTransform: "uppercase", fontWeight: 700 }}>{cat.type === "income" ? "▲" : "▼"}</span>
             </div>
             {/* Monthly cells with bar */}
             {monthList.map(m => {
@@ -1338,9 +1338,9 @@ function MonthlyCategoryReport({ actualTxns, categories, entities, filterEntity 
               return (
                 <div key={m.key} style={{ padding: "9px 8px", textAlign: "right", position: "relative" }}>
                   {barW > 0 && (
-                    <div style={{ position: "absolute", bottom: 4, right: 8, height: 3, width: barW, background: isPos ? C.accent + "55" : C.danger + "55", borderRadius: 2 }} />
+                    <div style={{ position: "absolute", bottom: 4, right: 8, height: 3, width: barW, background: isPos ? COLORS.accent + "55" : COLORS.danger + "55", borderRadius: 2 }} />
                   )}
-                  <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color: val === 0 ? C.textDim : isPos ? C.accent : C.danger }}>
+                  <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color: val === 0 ? COLORS.textDim : isPos ? COLORS.accent : COLORS.danger }}>
                     {val === 0 ? "—" : (isPos ? "+" : "") + fmtShort(val)}
                   </span>
                 </div>
@@ -1348,7 +1348,7 @@ function MonthlyCategoryReport({ actualTxns, categories, entities, filterEntity 
             })}
             {/* Row total */}
             <div style={{ padding: "9px 14px", textAlign: "right" }}>
-              <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 800, color: total >= 0 ? C.accent : C.danger }}>
+              <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 800, color: total >= 0 ? COLORS.accent : COLORS.danger }}>
                 {total >= 0 ? "+" : ""}{fmtShort(total)}
               </span>
             </div>
@@ -1357,8 +1357,8 @@ function MonthlyCategoryReport({ actualTxns, categories, entities, filterEntity 
 
         {/* Net row */}
         {data.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: `180px repeat(${monthList.length}, 1fr) 110px`, gap: 0, borderTop: `2px solid ${C.border}`, background: C.surfaceHigh, minWidth: 500 }}>
-            <div style={{ padding: "10px 14px", fontSize: 12, fontWeight: 800, color: C.text }}>Net Cash Flow</div>
+          <div style={{ display: "grid", gridTemplateColumns: `180px repeat(${monthList.length}, 1fr) 110px`, gap: 0, borderTop: `2px solid ${COLORS.border}`, background: COLORS.surfaceHigh, minWidth: 500 }}>
+            <div style={{ padding: "10px 14px", fontSize: 12, fontWeight: 800, color: COLORS.text }}>Net Cash Flow</div>
             {monthList.map(m => {
               const val = monthlyNet[m.key] || 0;
               return (
@@ -1380,8 +1380,8 @@ function MonthlyCategoryReport({ actualTxns, categories, entities, filterEntity 
 
       {/* Mini bar chart — monthly net */}
       {data.length > 0 && (
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "16px 20px", marginTop: 16 }}>
-          <div style={{ fontSize: 11, color: C.textMid, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 14 }}>Monthly Net Cash Flow</div>
+        <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "16px 20px", marginTop: 16 }}>
+          <div style={{ fontSize: 11, color: COLORS.textMid, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 14 }}>Monthly Net Cash Flow</div>
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end", height: 80 }}>
             {monthList.map(m => {
               const val = monthlyNet[m.key] || 0;
@@ -1390,11 +1390,11 @@ function MonthlyCategoryReport({ actualTxns, categories, entities, filterEntity 
               const isPos = val >= 0;
               return (
                 <div key={m.key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                  <div style={{ fontSize: 9, color: isPos ? C.accent : C.danger, fontWeight: 700, fontFamily: "monospace" }}>
+                  <div style={{ fontSize: 9, color: isPos ? COLORS.accent : COLORS.danger, fontWeight: 700, fontFamily: "monospace" }}>
                     {val === 0 ? "" : (isPos ? "+" : "") + fmtShort(val).replace("CA", "").replace(",000", "k")}
                   </div>
-                  <div style={{ width: "100%", maxWidth: 40, height: h, background: isPos ? C.accent + "88" : C.danger + "88", borderRadius: "4px 4px 0 0", border: `1px solid ${isPos ? C.accent + "66" : C.danger + "66"}` }} />
-                  <div style={{ fontSize: 9, color: C.textMid, textAlign: "center" }}>{m.label.split(" ")[0]}</div>
+                  <div style={{ width: "100%", maxWidth: 40, height: h, background: isPos ? COLORS.accent + "88" : COLORS.danger + "88", borderRadius: "4px 4px 0 0", border: `1px solid ${isPos ? COLORS.accent + "66" : COLORS.danger + "66"}` }} />
+                  <div style={{ fontSize: 9, color: COLORS.textMid, textAlign: "center" }}>{m.label.split(" ")[0]}</div>
                 </div>
               );
             })}
@@ -1440,24 +1440,24 @@ function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore
   },[rows]);
 
   return (
-    <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:canDelete?12:"12px 12px 0 0",overflow:"hidden"}}>
+    <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:canDelete?12:"12px 12px 0 0",overflow:"hidden"}}>
       {title&&(
-        <div style={{padding:"11px 14px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{padding:"11px 14px",borderBottom:`1px solid ${COLORS.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <span style={{fontWeight:700,fontSize:13}}>{title}</span>
-          {onMore&&<button onClick={onMore} style={{background:"none",border:"none",color:C.accent,cursor:"pointer",fontSize:11,fontWeight:700}}>View all →</button>}
+          {onMore&&<button onClick={onMore} style={{background:"none",border:"none",color:COLORS.accent,cursor:"pointer",fontSize:11,fontWeight:700}}>View all →</button>}
         </div>
       )}
 
       {/* Column headers — with select-all checkbox */}
-      <div style={{display:"grid",gridTemplateColumns:COLS,gap:10,padding:"8px 14px",borderBottom:`1px solid ${C.border}`,background:C.surfaceHigh}}>
+      <div style={{display:"grid",gridTemplateColumns:COLS,gap:10,padding:"8px 14px",borderBottom:`1px solid ${COLORS.border}`,background:COLORS.surfaceHigh}}>
         {canDelete&&(
           <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}>
             <input type="checkbox" checked={allSelected} ref={el=>{if(el)el.indeterminate=someSelected&&!allSelected;}}
               onChange={()=>onToggleSelectAll(actualIds)}
-              style={{width:14,height:14,cursor:"pointer",accentColor:C.accent}}/>
+              style={{width:14,height:14,cursor:"pointer",accentColor:COLORS.accent}}/>
           </div>
         )}
-        {LABELS.map(l=><span key={l} style={{fontSize:10,color:C.textDim,textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:700}}>{l}</span>)}
+        {LABELS.map(l=><span key={l} style={{fontSize:10,color:COLORS.textDim,textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:700}}>{l}</span>)}
       </div>
 
       <div style={{maxHeight:showAll?620:380,overflowY:"auto"}}>
@@ -1465,13 +1465,13 @@ function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore
         {withDivider.map((row,idx)=>{
           // TODAY divider
           if(row._isDivider) return (
-            <div key="div" style={{display:"flex",alignItems:"center",gap:10,padding:"6px 14px",background:"#0F1800",borderTop:`1px solid ${C.warning}44`,borderBottom:`1px solid ${C.warning}44`,position:"sticky",top:0,zIndex:10}}>
-              <div style={{flex:1,height:1,background:`linear-gradient(90deg,transparent,${C.warning}66)`}}/>
-              <div style={{display:"flex",alignItems:"center",gap:7,background:C.warning+"22",border:`1px solid ${C.warning}55`,borderRadius:20,padding:"3px 12px"}}>
-                <div style={{width:6,height:6,borderRadius:"50%",background:C.warning}}/>
-                <span style={{fontSize:10,fontWeight:800,color:C.warning,letterSpacing:"0.1em",textTransform:"uppercase"}}>Today — {TODAY_STR}</span>
+            <div key="div" style={{display:"flex",alignItems:"center",gap:10,padding:"6px 14px",background:"#0F1800",borderTop:`1px solid ${COLORS.warning}44`,borderBottom:`1px solid ${COLORS.warning}44`,position:"sticky",top:0,zIndex:10}}>
+              <div style={{flex:1,height:1,background:`linear-gradient(90deg,transparent,${COLORS.warning}66)`}}/>
+              <div style={{display:"flex",alignItems:"center",gap:7,background:COLORS.warning+"22",border:`1px solid ${COLORS.warning}55`,borderRadius:20,padding:"3px 12px"}}>
+                <div style={{width:6,height:6,borderRadius:"50%",background:COLORS.warning}}/>
+                <span style={{fontSize:10,fontWeight:800,color:COLORS.warning,letterSpacing:"0.1em",textTransform:"uppercase"}}>Today — {TODAY_STR}</span>
               </div>
-              <div style={{flex:1,height:1,background:`linear-gradient(90deg,${C.warning}66,transparent)`}}/>
+              <div style={{flex:1,height:1,background:`linear-gradient(90deg,${COLORS.warning}66,transparent)`}}/>
             </div>
           );
 
@@ -1483,9 +1483,9 @@ function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore
           return (
             <div key={row.id+idx} className="rh" style={{
               display:"grid", gridTemplateColumns:COLS, gap:10, padding:"8px 14px", alignItems:"center",
-              borderBottom:`1px solid ${C.border}`,
+              borderBottom:`1px solid ${COLORS.border}`,
               background: isSelected ? "#1A0A0A" : isProj ? "#0A1525" : "transparent",
-              borderLeft: isSelected ? `3px solid ${C.danger}` : isProj ? `3px dashed ${C.blue}55` : `3px solid transparent`,
+              borderLeft: isSelected ? `3px solid ${COLORS.danger}` : isProj ? `3px dashed ${COLORS.blue}55` : `3px solid transparent`,
               transition:"background 0.12s",
               opacity: isProj ? 0.88 : 1,
             }}>
@@ -1494,29 +1494,29 @@ function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore
                 <div style={{display:"flex",alignItems:"center",justifyContent:"center"}}>
                   {!isProj
                     ? <input type="checkbox" checked={!!isSelected} onChange={()=>onToggleSelect(row.id)}
-                        style={{width:14,height:14,cursor:"pointer",accentColor:C.danger}}/>
+                        style={{width:14,height:14,cursor:"pointer",accentColor:COLORS.danger}}/>
                     : <span style={{width:14,height:14,display:"inline-block"}}/>
                   }
                 </div>
               )}
 
               {/* Date */}
-              <span style={{fontSize:11,fontFamily:"monospace",color:isProj?C.blue:C.textMid}}>{row._date.slice(5)}</span>
+              <span style={{fontSize:11,fontFamily:"monospace",color:isProj?COLORS.blue:COLORS.textMid}}>{row._date.slice(5)}</span>
 
               {/* Entity */}
               <div style={{display:"flex",alignItems:"center",gap:4}}>
-                <Dot color={ent?.color||C.textMid} size={6}/>
-                <span style={{fontSize:10,color:ent?.color||C.textMid,fontWeight:700}}>{ent?.short||"—"}</span>
+                <Dot color={ent?.color||COLORS.textMid} size={6}/>
+                <span style={{fontSize:10,color:ent?.color||COLORS.textMid,fontWeight:700}}>{ent?.short||"—"}</span>
               </div>
 
               {/* Description */}
               <div>
-                <div style={{fontSize:12,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.description}</div>
-                {isProj&&row.recurrence!=="once"&&<div style={{fontSize:9,color:C.blue,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.08em"}}>↻ {row.recurrence}</div>}
+                <div style={{fontSize:12,color:COLORS.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.description}</div>
+                {isProj&&row.recurrence!=="once"&&<div style={{fontSize:9,color:COLORS.blue,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.08em"}}>↻ {row.recurrence}</div>}
               </div>
 
               {/* Amount */}
-              <span style={{textAlign:"right",fontWeight:700,fontFamily:"monospace",fontSize:13,color:row.type==="income"?C.accent:C.danger}}>
+              <span style={{textAlign:"right",fontWeight:700,fontFamily:"monospace",fontSize:13,color:row.type==="income"?COLORS.accent:COLORS.danger}}>
                 {row.type==="income"?"+":"−"}{fmtShort(row.amount)}
               </span>
 
@@ -1525,7 +1525,7 @@ function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore
 
               {/* Status */}
               <div>
-                {isProj ? <Badge color={C.blue}>Projected</Badge> : <Badge color={C.accent}>QB Actual</Badge>}
+                {isProj ? <Badge color={COLORS.blue}>Projected</Badge> : <Badge color={COLORS.accent}>QB Actual</Badge>}
               </div>
 
               {/* Running balance */}
@@ -1538,21 +1538,21 @@ function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore
               {/* Delete button / Source badge */}
               {canDelete ? (
                 <button onClick={()=>onDeleteSingle(row)} title={isProj?"Delete projected transaction":"Delete transaction"}
-                  style={{background:"transparent",border:`1px solid ${isProj?C.blue+"44":C.border}`,color:isProj?C.blue+"88":C.textDim,borderRadius:6,padding:"3px 7px",fontSize:12,cursor:"pointer",lineHeight:1,transition:"all 0.15s"}}
+                  style={{background:"transparent",border:`1px solid ${isProj?COLORS.blue+"44":COLORS.border}`,color:isProj?COLORS.blue+"88":COLORS.textDim,borderRadius:6,padding:"3px 7px",fontSize:12,cursor:"pointer",lineHeight:1,transition:"all 0.15s"}}
                   onMouseEnter={e=>{
-                    e.currentTarget.style.background=isProj?C.blueDim:C.dangerDim;
-                    e.currentTarget.style.borderColor=isProj?C.blue+"88":C.danger+"55";
-                    e.currentTarget.style.color=isProj?C.blue:C.danger;
+                    e.currentTarget.style.background=isProj?COLORS.blueDim:COLORS.dangerDim;
+                    e.currentTarget.style.borderColor=isProj?COLORS.blue+"88":COLORS.danger+"55";
+                    e.currentTarget.style.color=isProj?COLORS.blue:COLORS.danger;
                   }}
                   onMouseLeave={e=>{
                     e.currentTarget.style.background="transparent";
-                    e.currentTarget.style.borderColor=isProj?C.blue+"44":C.border;
-                    e.currentTarget.style.color=isProj?C.blue+"88":C.textDim;
+                    e.currentTarget.style.borderColor=isProj?COLORS.blue+"44":COLORS.border;
+                    e.currentTarget.style.color=isProj?COLORS.blue+"88":COLORS.textDim;
                   }}>
                   🗑
                 </button>
               ) : (
-                <Badge color={row.source==="quickbooks"?C.qb:isProj?C.blue:C.warning}>
+                <Badge color={row.source==="quickbooks"?COLORS.qb:isProj?COLORS.blue:COLORS.warning}>
                   {row.source==="quickbooks"?"QB":isProj?"Forecast":"Manual"}
                 </Badge>
               )}
@@ -1586,8 +1586,8 @@ function ProjectionsTab({projections,setProjections,filteredProjOccs,entities,ac
 
   return(<>
     <SectionHead title="Projection Rules" sub="Define recurring & one-time future cash flows. Projected items appear in the Transactions tab."/>
-    <div style={{background:C.surface,border:`1px solid ${editId?C.blue+"55":C.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
-      <div style={{fontSize:12,fontWeight:700,color:editId?C.blue:C.accent,marginBottom:14}}>{editId?"✏ Edit Rule":"＋ New Rule"}</div>
+    <div style={{background:COLORS.surface,border:`1px solid ${editId?COLORS.blue+"55":COLORS.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
+      <div style={{fontSize:12,fontWeight:700,color:editId?COLORS.blue:COLORS.accent,marginBottom:14}}>{editId?"✏ Edit Rule":"＋ New Rule"}</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:10}}>
         <Fld label="Entity"><select style={selS()} value={form.entityId} onChange={e=>setForm(f=>({...f,entityId:e.target.value}))}>{entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></Fld>
         <Fld label="Account"><select style={selS()} value={form.accountId} onChange={e=>setForm(f=>({...f,accountId:e.target.value}))}>{formAccs.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></Fld>
@@ -1603,13 +1603,13 @@ function ProjectionsTab({projections,setProjections,filteredProjOccs,entities,ac
         <Fld label={form.recurrence==="once"?"Date":"Start Date"}><input style={inpS()} type="date" value={form.startDate} onChange={e=>setForm(f=>({...f,startDate:e.target.value}))}/></Fld>
         {form.recurrence!=="once"&&<Fld label="End Date"><input style={inpS()} type="date" value={form.endDate} onChange={e=>setForm(f=>({...f,endDate:e.target.value}))}/></Fld>}
         <div style={{gridColumn:form.recurrence==="once"?"2/4":"3/5",display:"flex",gap:8,alignItems:"flex-end"}}>
-          <button onClick={save} style={{flex:1,background:editId?C.blue:C.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:13,cursor:"pointer"}}>{editId?"Save Changes":"Add Rule"}</button>
-          {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"9px 12px",fontSize:12,cursor:"pointer"}}>Cancel</button>}
+          <button onClick={save} style={{flex:1,background:editId?COLORS.blue:COLORS.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:13,cursor:"pointer"}}>{editId?"Save Changes":"Add Rule"}</button>
+          {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"9px 12px",fontSize:12,cursor:"pointer"}}>Cancel</button>}
         </div>
       </div>
     </div>
 
-    <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
+    <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,overflow:"hidden"}}>
       <ColHdr cols="90px 1fr 90px 90px 90px 130px 80px 100px" labels={["Entity","Description","Amount","Type","Recurrence","Date Range","Occurrences","Actions"]}/>
       {projections.length===0&&<Empty msg="No projection rules. Add one above."/>}
       {projections.sort((a,b)=>a.startDate.localeCompare(b.startDate)).map(p=>{
@@ -1617,17 +1617,17 @@ function ProjectionsTab({projections,setProjections,filteredProjOccs,entities,ac
         const occ=expandRecurring(p);
         const cat=categories.find(c=>c.id===p.categoryId);
         return(
-          <div key={p.id} className="rh" style={{display:"grid",gridTemplateColumns:"90px 1fr 90px 90px 90px 130px 80px 100px",gap:10,padding:"9px 14px",alignItems:"center",borderBottom:`1px solid ${C.border}`,background:editId===p.id?C.blue+"09":"transparent",transition:"background 0.12s"}}>
-            <div style={{display:"flex",alignItems:"center",gap:5}}><Dot color={ent?.color||C.textMid} size={7}/><span style={{fontSize:11,color:ent?.color,fontWeight:700}}>{ent?.short}</span></div>
-            <div><div style={{fontSize:12,color:C.text,fontWeight:500}}>{p.description}</div>{cat&&<Badge color={cat.color}>{cat.name}</Badge>}</div>
-            <span style={{textAlign:"right",fontWeight:700,fontFamily:"monospace",fontSize:12,color:p.type==="income"?C.accent:C.danger}}>{p.type==="income"?"+":"−"}{fmtShort(p.amount)}</span>
-            <Badge color={p.type==="income"?C.accent:C.danger}>{p.type==="income"?"Income":"Expense"}</Badge>
-            <Badge color={C.purple}>{p.recurrence}</Badge>
-            <span style={{fontSize:10,color:C.textMid,fontFamily:"monospace"}}>{p.startDate.slice(5)}{p.recurrence!=="once"?" → "+p.endDate?.slice(5):""}</span>
-            <span style={{fontSize:11,color:C.textMid}}>{occ.length}× <span style={{color:p.type==="income"?C.accent:C.danger}}>{fmtShort(occ.length*p.amount)}</span></span>
+          <div key={p.id} className="rh" style={{display:"grid",gridTemplateColumns:"90px 1fr 90px 90px 90px 130px 80px 100px",gap:10,padding:"9px 14px",alignItems:"center",borderBottom:`1px solid ${COLORS.border}`,background:editId===p.id?COLORS.blue+"09":"transparent",transition:"background 0.12s"}}>
+            <div style={{display:"flex",alignItems:"center",gap:5}}><Dot color={ent?.color||COLORS.textMid} size={7}/><span style={{fontSize:11,color:ent?.color,fontWeight:700}}>{ent?.short}</span></div>
+            <div><div style={{fontSize:12,color:COLORS.text,fontWeight:500}}>{p.description}</div>{cat&&<Badge color={cat.color}>{cat.name}</Badge>}</div>
+            <span style={{textAlign:"right",fontWeight:700,fontFamily:"monospace",fontSize:12,color:p.type==="income"?COLORS.accent:COLORS.danger}}>{p.type==="income"?"+":"−"}{fmtShort(p.amount)}</span>
+            <Badge color={p.type==="income"?COLORS.accent:COLORS.danger}>{p.type==="income"?"Income":"Expense"}</Badge>
+            <Badge color={COLORS.purple}>{p.recurrence}</Badge>
+            <span style={{fontSize:10,color:COLORS.textMid,fontFamily:"monospace"}}>{p.startDate.slice(5)}{p.recurrence!=="once"?" → "+p.endDate?.slice(5):""}</span>
+            <span style={{fontSize:11,color:COLORS.textMid}}>{occ.length}× <span style={{color:p.type==="income"?COLORS.accent:COLORS.danger}}>{fmtShort(occ.length*p.amount)}</span></span>
             <div style={{display:"flex",gap:5}}>
-              <button onClick={()=>startEdit(p)} style={{background:C.blueDim,border:`1px solid ${C.blue}33`,color:C.blue,borderRadius:5,padding:"3px 7px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button>
-              <button onClick={()=>del(p.id)} style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,color:C.danger,borderRadius:5,padding:"3px 7px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button>
+              <button onClick={()=>startEdit(p)} style={{background:COLORS.blueDim,border:`1px solid ${COLORS.blue}33`,color:COLORS.blue,borderRadius:5,padding:"3px 7px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button>
+              <button onClick={()=>del(p.id)} style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,color:COLORS.danger,borderRadius:5,padding:"3px 7px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button>
             </div>
           </div>
         );
@@ -1643,11 +1643,11 @@ function SettingsTab({entities,setEntities,accounts,setAccounts,categories,setCa
   const STABS=["entities","accounts","categories","users","bank sync"];
   return(<>
     <SectionHead title="Settings" sub="Manage entities, accounts, categories, users and bank connections"/>
-    <div style={{display:"flex",gap:0,marginBottom:22,borderBottom:`1px solid ${C.border}`}}>
+    <div style={{display:"flex",gap:0,marginBottom:22,borderBottom:`1px solid ${COLORS.border}`}}>
       {STABS.map(t=>(
-        <button key={t} onClick={()=>setSettingsTab(t)} style={{background:"transparent",color:settingsTab===t?C.accent:C.textMid,border:"none",borderBottom:settingsTab===t?`2px solid ${C.accent}`:"2px solid transparent",padding:"8px 14px",fontSize:12,fontWeight:600,cursor:"pointer",textTransform:"capitalize",position:"relative"}}>
+        <button key={t} onClick={()=>setSettingsTab(t)} style={{background:"transparent",color:settingsTab===t?COLORS.accent:COLORS.textMid,border:"none",borderBottom:settingsTab===t?`2px solid ${COLORS.accent}`:"2px solid transparent",padding:"8px 14px",fontSize:12,fontWeight:600,cursor:"pointer",textTransform:"capitalize",position:"relative"}}>
           {t}
-          {t==="users"&&<span style={{marginLeft:5,fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:99,background:C.purple+"22",color:C.purple,border:`1px solid ${C.purple}33`}}>{users?.length||0}</span>}
+          {t==="users"&&<span style={{marginLeft:5,fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:99,background:COLORS.purple+"22",color:COLORS.purple,border:`1px solid ${COLORS.purple}33`}}>{users?.length||0}</span>}
         </button>
       ))}
     </div>
@@ -1666,18 +1666,18 @@ function EntitiesSettings({entities,setEntities}){
   const startEdit=(e)=>{setForm({name:e.name,short:e.short,color:e.color});setEditId(e.id);};
   const del=(id)=>{setEntities(p=>p.filter(e=>e.id!==id));if(editId===id){setEditId(null);setForm(blank);}};
   return(<div>
-    <div style={{background:C.surface,border:`1px solid ${editId?C.blue+"55":C.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
-      <div style={{fontSize:12,fontWeight:700,color:editId?C.blue:C.accent,marginBottom:14}}>{editId?"✏ Edit Entity":"＋ New Entity"}</div>
+    <div style={{background:COLORS.surface,border:`1px solid ${editId?COLORS.blue+"55":COLORS.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
+      <div style={{fontSize:12,fontWeight:700,color:editId?COLORS.blue:COLORS.accent,marginBottom:14}}>{editId?"✏ Edit Entity":"＋ New Entity"}</div>
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 160px 90px",gap:10,alignItems:"end"}}>
         <Fld label="Company Name"><input style={inpS()} placeholder="Canada MedLaser Inc" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
         <Fld label="Short Code"><input style={inpS()} placeholder="CML" value={form.short} onChange={e=>setForm(f=>({...f,short:e.target.value.toUpperCase().slice(0,6)}))}/></Fld>
-        <Fld label="Colour"><div style={{display:"flex",gap:5,flexWrap:"wrap",paddingTop:2}}>{PALETTE.map(p=><div key={p} onClick={()=>setForm(f=>({...f,color:p}))} style={{width:22,height:22,borderRadius:"50%",background:p,cursor:"pointer",border:form.color===p?`3px solid ${C.text}`:`2px solid ${C.bg}`}}/>)}</div></Fld>
-        <div style={{display:"flex",gap:6,alignItems:"flex-end"}}><button onClick={save} style={{flex:1,background:editId?C.blue:C.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>{editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}</div>
+        <Fld label="Colour"><div style={{display:"flex",gap:5,flexWrap:"wrap",paddingTop:2}}>{PALETTE.map(p=><div key={p} onClick={()=>setForm(f=>({...f,color:p}))} style={{width:22,height:22,borderRadius:"50%",background:p,cursor:"pointer",border:form.color===p?`3px solid ${COLORS.text}`:`2px solid ${COLORS.bg}`}}/>)}</div></Fld>
+        <div style={{display:"flex",gap:6,alignItems:"flex-end"}}><button onClick={save} style={{flex:1,background:editId?COLORS.blue:COLORS.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>{editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}</div>
       </div>
     </div>
-    <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
+    <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,overflow:"hidden"}}>
       <ColHdr cols="50px 1fr 100px 100px" labels={["","Name","Short","Actions"]}/>
-      {entities.map(e=><div key={e.id} className="rh" style={{display:"grid",gridTemplateColumns:"50px 1fr 100px 100px",gap:10,padding:"10px 14px",alignItems:"center",borderBottom:`1px solid ${C.border}`,transition:"background 0.12s"}}><Dot color={e.color} size={14}/><span style={{fontSize:13,color:C.text,fontWeight:600}}>{e.name}</span><Badge color={e.color}>{e.short}</Badge><div style={{display:"flex",gap:5}}><button onClick={()=>startEdit(e)} style={{background:C.blueDim,border:`1px solid ${C.blue}33`,color:C.blue,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button><button onClick={()=>del(e.id)} style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,color:C.danger,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button></div></div>)}
+      {entities.map(e=><div key={e.id} className="rh" style={{display:"grid",gridTemplateColumns:"50px 1fr 100px 100px",gap:10,padding:"10px 14px",alignItems:"center",borderBottom:`1px solid ${COLORS.border}`,transition:"background 0.12s"}}><Dot color={e.color} size={14}/><span style={{fontSize:13,color:COLORS.text,fontWeight:600}}>{e.name}</span><Badge color={e.color}>{e.short}</Badge><div style={{display:"flex",gap:5}}><button onClick={()=>startEdit(e)} style={{background:COLORS.blueDim,border:`1px solid ${COLORS.blue}33`,color:COLORS.blue,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button><button onClick={()=>del(e.id)} style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,color:COLORS.danger,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button></div></div>)}
       {entities.length===0&&<Empty msg="No entities."/>}
     </div>
   </div>);
@@ -1689,7 +1689,7 @@ function AccountsSettings({accounts,setAccounts,entities}){
   const save=()=>{
     if(!form.name||!form.entityId)return;
     const ent=entities.find(e=>e.id===form.entityId);
-    const a={...form,openBalance:parseFloat(form.openBalance)||0,overdraft:parseFloat(form.overdraft)||0,color:ent?.color||C.textMid};
+    const a={...form,openBalance:parseFloat(form.openBalance)||0,overdraft:parseFloat(form.overdraft)||0,color:ent?.color||COLORS.textMid};
     if(editId){setAccounts(p=>p.map(x=>x.id===editId?{...a,id:editId}:x));setEditId(null);}
     else setAccounts(p=>[...p,{...a,id:uid()}]);
     setForm(blank);
@@ -1697,8 +1697,8 @@ function AccountsSettings({accounts,setAccounts,entities}){
   const startEdit=(a)=>{setForm({entityId:a.entityId,name:a.name,number:a.number,openBalance:String(a.openBalance),overdraft:String(a.overdraft||0)});setEditId(a.id);};
   const del=(id)=>{setAccounts(p=>p.filter(a=>a.id!==id));if(editId===id){setEditId(null);setForm(blank);}};
   return(<div>
-    <div style={{background:C.surface,border:`1px solid ${editId?C.blue+"55":C.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
-      <div style={{fontSize:12,fontWeight:700,color:editId?C.blue:C.accent,marginBottom:14}}>{editId?"✏ Edit Account":"＋ New Account"}</div>
+    <div style={{background:COLORS.surface,border:`1px solid ${editId?COLORS.blue+"55":COLORS.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
+      <div style={{fontSize:12,fontWeight:700,color:editId?COLORS.blue:COLORS.accent,marginBottom:14}}>{editId?"✏ Edit Account":"＋ New Account"}</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr 90px",gap:10,alignItems:"end"}}>
         <Fld label="Entity"><select style={selS()} value={form.entityId} onChange={e=>setForm(f=>({...f,entityId:e.target.value}))}>{entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></Fld>
         <Fld label="Account Name"><input style={inpS()} placeholder="RBC Operations" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
@@ -1706,48 +1706,48 @@ function AccountsSettings({accounts,setAccounts,entities}){
         <Fld label="Opening Balance (CAD)"><input style={inpS()} type="number" placeholder="0.00" value={form.openBalance} onChange={e=>setForm(f=>({...f,openBalance:e.target.value}))}/></Fld>
         <Fld label="Overdraft Limit (CAD)">
           <div style={{position:"relative"}}>
-            <input style={{...inpS(),borderColor:form.overdraft&&parseFloat(form.overdraft)>0?C.danger+"66":C.border}} type="number" placeholder="0 = none" value={form.overdraft} onChange={e=>setForm(f=>({...f,overdraft:e.target.value}))}/>
-            {form.overdraft&&parseFloat(form.overdraft)>0&&<span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",fontSize:9,color:C.danger,fontWeight:700,pointerEvents:"none"}}>−{fmtShort(parseFloat(form.overdraft))}</span>}
+            <input style={{...inpS(),borderColor:form.overdraft&&parseFloat(form.overdraft)>0?COLORS.danger+"66":COLORS.border}} type="number" placeholder="0 = none" value={form.overdraft} onChange={e=>setForm(f=>({...f,overdraft:e.target.value}))}/>
+            {form.overdraft&&parseFloat(form.overdraft)>0&&<span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",fontSize:9,color:COLORS.danger,fontWeight:700,pointerEvents:"none"}}>−{fmtShort(parseFloat(form.overdraft))}</span>}
           </div>
         </Fld>
         <div style={{display:"flex",gap:6,alignItems:"flex-end"}}>
-          <button onClick={save} style={{flex:1,background:editId?C.blue:C.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>
-          {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}
+          <button onClick={save} style={{flex:1,background:editId?COLORS.blue:COLORS.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>
+          {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}
         </div>
       </div>
       {/* Overdraft explanation */}
-      <div style={{marginTop:12,padding:"8px 12px",background:C.dangerDim,border:`1px solid ${C.danger}22`,borderRadius:7,fontSize:11,color:C.textMid,lineHeight:1.5}}>
-        <span style={{color:C.danger,fontWeight:700}}>Overdraft limit</span> — the maximum amount the bank allows you to go below zero. E.g. enter 5000 if your bank allows −$5,000. Balance turns <span style={{color:C.danger,fontWeight:700}}>red</span> when it drops below this limit, <span style={{color:C.warning,fontWeight:700}}>amber</span> when it dips negative but is within the limit.
+      <div style={{marginTop:12,padding:"8px 12px",background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}22`,borderRadius:7,fontSize:11,color:COLORS.textMid,lineHeight:1.5}}>
+        <span style={{color:COLORS.danger,fontWeight:700}}>Overdraft limit</span> — the maximum amount the bank allows you to go below zero. E.g. enter 5000 if your bank allows −$5,000. Balance turns <span style={{color:COLORS.danger,fontWeight:700}}>red</span> when it drops below this limit, <span style={{color:COLORS.warning,fontWeight:700}}>amber</span> when it dips negative but is within the limit.
       </div>
     </div>
 
     {/* Accounts table */}
-    <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
+    <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,overflow:"hidden"}}>
       {entities.map(ent=>{
         const eAccs=accounts.filter(a=>a.entityId===ent.id);
         if(!eAccs.length) return null;
         return(
           <div key={ent.id}>
-            <div style={{padding:"7px 14px",background:C.surfaceHigh,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:7}}>
+            <div style={{padding:"7px 14px",background:COLORS.surfaceHigh,borderBottom:`1px solid ${COLORS.border}`,display:"flex",alignItems:"center",gap:7}}>
               <Dot color={ent.color} size={8}/>
               <span style={{fontSize:11,color:ent.color,fontWeight:700}}>{ent.name}</span>
-              <span style={{fontSize:10,color:C.textDim,marginLeft:"auto"}}>Total: {fmtShort(eAccs.reduce((s,a)=>s+(a.openBalance||0),0))}</span>
+              <span style={{fontSize:10,color:COLORS.textDim,marginLeft:"auto"}}>Total: {fmtShort(eAccs.reduce((s,a)=>s+(a.openBalance||0),0))}</span>
             </div>
             {eAccs.map(a=>(
-              <div key={a.id} className="rh" style={{display:"grid",gridTemplateColumns:"100px 1fr 120px 130px 120px 100px",gap:10,padding:"9px 14px",alignItems:"center",borderBottom:`1px solid ${C.border}`,transition:"background 0.12s"}}>
+              <div key={a.id} className="rh" style={{display:"grid",gridTemplateColumns:"100px 1fr 120px 130px 120px 100px",gap:10,padding:"9px 14px",alignItems:"center",borderBottom:`1px solid ${COLORS.border}`,transition:"background 0.12s"}}>
                 <Badge color={ent.color}>{ent.short}</Badge>
-                <span style={{fontSize:13,color:C.text}}>{a.name}</span>
-                <span style={{fontSize:12,fontFamily:"monospace",color:C.textMid}}>{a.number}</span>
-                <span style={{fontSize:13,fontWeight:700,fontFamily:"monospace",color:C.accent}}>{fmtCAD(a.openBalance||0)}</span>
+                <span style={{fontSize:13,color:COLORS.text}}>{a.name}</span>
+                <span style={{fontSize:12,fontFamily:"monospace",color:COLORS.textMid}}>{a.number}</span>
+                <span style={{fontSize:13,fontWeight:700,fontFamily:"monospace",color:COLORS.accent}}>{fmtCAD(a.openBalance||0)}</span>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                   {(a.overdraft||0)>0
-                    ? <span style={{fontSize:12,fontFamily:"monospace",fontWeight:700,color:C.danger}}>−{fmtShort(a.overdraft)}</span>
-                    : <span style={{fontSize:11,color:C.textDim}}>No overdraft</span>
+                    ? <span style={{fontSize:12,fontFamily:"monospace",fontWeight:700,color:COLORS.danger}}>−{fmtShort(a.overdraft)}</span>
+                    : <span style={{fontSize:11,color:COLORS.textDim}}>No overdraft</span>
                   }
                 </div>
                 <div style={{display:"flex",gap:5}}>
-                  <button onClick={()=>startEdit(a)} style={{background:C.blueDim,border:`1px solid ${C.blue}33`,color:C.blue,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button>
-                  <button onClick={()=>del(a.id)} style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,color:C.danger,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button>
+                  <button onClick={()=>startEdit(a)} style={{background:COLORS.blueDim,border:`1px solid ${COLORS.blue}33`,color:COLORS.blue,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button>
+                  <button onClick={()=>del(a.id)} style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,color:COLORS.danger,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button>
                 </div>
               </div>
             ))}
@@ -1757,7 +1757,7 @@ function AccountsSettings({accounts,setAccounts,entities}){
       {accounts.length===0&&<Empty msg="No accounts."/>}
     </div>
     {/* Column header for accounts table */}
-    <style>{`.acc-hdr{display:grid;grid-template-columns:100px 1fr 120px 130px 120px 100px;gap:10px;padding:8px 14px;background:${C.surfaceHigh};border-bottom:1px solid ${C.border}}`}</style>
+    <style>{`.acc-hdr{display:grid;grid-template-columns:100px 1fr 120px 130px 120px 100px;gap:10px;padding:8px 14px;background:${COLORS.surfaceHigh};border-bottom:1px solid ${COLORS.border}}`}</style>
   </div>);
 }
 
@@ -1768,20 +1768,20 @@ function CategoriesSettings({categories,setCategories}){
   const startEdit=(c)=>{setForm({name:c.name,type:c.type,color:c.color});setEditId(c.id);};
   const del=(id)=>{setCategories(p=>p.filter(c=>c.id!==id));if(editId===id){setEditId(null);setForm(blank);}};
   return(<div>
-    <div style={{background:C.surface,border:`1px solid ${editId?C.blue+"55":C.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
-      <div style={{fontSize:12,fontWeight:700,color:editId?C.blue:C.accent,marginBottom:14}}>{editId?"✏ Edit Category":"＋ New Category"}</div>
+    <div style={{background:COLORS.surface,border:`1px solid ${editId?COLORS.blue+"55":COLORS.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
+      <div style={{fontSize:12,fontWeight:700,color:editId?COLORS.blue:COLORS.accent,marginBottom:14}}>{editId?"✏ Edit Category":"＋ New Category"}</div>
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 160px 90px",gap:10,alignItems:"end"}}>
         <Fld label="Name"><input style={inpS()} placeholder="Franchise Fees" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
         <Fld label="Type"><select style={selS()} value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}><option value="income">Income</option><option value="expense">Expense</option></select></Fld>
-        <Fld label="Colour"><div style={{display:"flex",gap:5,flexWrap:"wrap",paddingTop:2}}>{PALETTE.map(p=><div key={p} onClick={()=>setForm(f=>({...f,color:p}))} style={{width:20,height:20,borderRadius:"50%",background:p,cursor:"pointer",border:form.color===p?`3px solid ${C.text}`:`2px solid ${C.bg}`}}/>)}</div></Fld>
-        <div style={{display:"flex",gap:6,alignItems:"flex-end"}}><button onClick={save} style={{flex:1,background:editId?C.blue:C.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>{editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}</div>
+        <Fld label="Colour"><div style={{display:"flex",gap:5,flexWrap:"wrap",paddingTop:2}}>{PALETTE.map(p=><div key={p} onClick={()=>setForm(f=>({...f,color:p}))} style={{width:20,height:20,borderRadius:"50%",background:p,cursor:"pointer",border:form.color===p?`3px solid ${COLORS.text}`:`2px solid ${COLORS.bg}`}}/>)}</div></Fld>
+        <div style={{display:"flex",gap:6,alignItems:"flex-end"}}><button onClick={save} style={{flex:1,background:editId?COLORS.blue:COLORS.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>{editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:COLORS.surfaceHigh,color:COLORS.textMid,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}</div>
       </div>
     </div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-      {[{label:"Income",list:categories.filter(c=>c.type==="income"),color:C.accent},{label:"Expense",list:categories.filter(c=>c.type==="expense"),color:C.danger}].map(({label,list,color})=>(
-        <div key={label} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
-          <div style={{padding:"10px 14px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between"}}><span style={{fontWeight:700,fontSize:12,color}}>{label} Categories</span><span style={{fontSize:11,color:C.textMid}}>{list.length}</span></div>
-          {list.map(c=><div key={c.id} className="rh" style={{display:"flex",alignItems:"center",gap:10,padding:"8px 14px",borderBottom:`1px solid ${C.border}`,transition:"background 0.12s"}}><Dot color={c.color} size={10}/><span style={{flex:1,fontSize:13,color:C.text}}>{c.name}</span><button onClick={()=>startEdit(c)} style={{background:C.blueDim,border:`1px solid ${C.blue}33`,color:C.blue,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button><button onClick={()=>del(c.id)} style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,color:C.danger,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button></div>)}
+      {[{label:"Income",list:categories.filter(c=>c.type==="income"),color:COLORS.accent},{label:"Expense",list:categories.filter(c=>c.type==="expense"),color:COLORS.danger}].map(({label,list,color})=>(
+        <div key={label} style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,overflow:"hidden"}}>
+          <div style={{padding:"10px 14px",borderBottom:`1px solid ${COLORS.border}`,display:"flex",justifyContent:"space-between"}}><span style={{fontWeight:700,fontSize:12,color}}>{label} Categories</span><span style={{fontSize:11,color:COLORS.textMid}}>{list.length}</span></div>
+          {list.map(c=><div key={c.id} className="rh" style={{display:"flex",alignItems:"center",gap:10,padding:"8px 14px",borderBottom:`1px solid ${COLORS.border}`,transition:"background 0.12s"}}><Dot color={c.color} size={10}/><span style={{flex:1,fontSize:13,color:COLORS.text}}>{c.name}</span><button onClick={()=>startEdit(c)} style={{background:COLORS.blueDim,border:`1px solid ${COLORS.blue}33`,color:COLORS.blue,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button><button onClick={()=>del(c.id)} style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,color:COLORS.danger,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button></div>)}
           {list.length===0&&<Empty msg="No categories."/>}
         </div>
       ))}
@@ -1836,31 +1836,31 @@ function BankSyncPanel({ entities }){
 
   return(<div>
     {/* Header */}
-    <div style={{background:C.surface,border:`1px solid ${C.accent}44`,borderRadius:12,padding:16,marginBottom:20,display:"flex",gap:14,alignItems:"flex-start"}}>
+    <div style={{background:COLORS.surface,border:`1px solid ${COLORS.accent}44`,borderRadius:12,padding:16,marginBottom:20,display:"flex",gap:14,alignItems:"flex-start"}}>
       <span style={{fontSize:22}}>🔗</span>
       <div style={{flex:1}}>
-        <div style={{fontWeight:700,color:C.accent,fontSize:13,marginBottom:4}}>QuickBooks Integration</div>
-        <div style={{color:C.textMid,fontSize:12,lineHeight:1.6}}>
+        <div style={{fontWeight:700,color:COLORS.accent,fontSize:13,marginBottom:4}}>QuickBooks Integration</div>
+        <div style={{color:COLORS.textMid,fontSize:12,lineHeight:1.6}}>
           Connect each QuickBooks company file once. After connecting, click "Sync QB" in the top bar to pull the latest transactions. Tokens auto-refresh — you only re-authorize once every ~100 days.
         </div>
       </div>
       {connections.filter(c=>!c.needsReauth).length>0&&(
-        <button onClick={syncNow} disabled={syncing} style={{background:syncing?C.surfaceHigh:C.qb,color:syncing?C.textMid:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:syncing?"not-allowed":"pointer",whiteSpace:"nowrap",flexShrink:0}}>
+        <button onClick={syncNow} disabled={syncing} style={{background:syncing?COLORS.surfaceHigh:COLORS.qb,color:syncing?COLORS.textMid:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:syncing?"not-allowed":"pointer",whiteSpace:"nowrap",flexShrink:0}}>
           {syncing?"Syncing…":"⬇ Sync All Now"}
         </button>
       )}
     </div>
 
     {/* Last sync + result */}
-    {lastSync&&<div style={{background:C.accentDim,border:`1px solid ${C.accent}33`,borderRadius:8,padding:"8px 14px",marginBottom:16,fontSize:12,color:C.accent}}>
+    {lastSync&&<div style={{background:COLORS.accentDim,border:`1px solid ${COLORS.accent}33`,borderRadius:8,padding:"8px 14px",marginBottom:16,fontSize:12,color:COLORS.accent}}>
       ✓ Last sync: {new Date(lastSync).toLocaleString("en-CA")}
       {syncResult&&!syncResult.error&&` — ${syncResult.totalCount} transactions pulled`}
     </div>}
-    {syncResult?.error&&<div style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,borderRadius:8,padding:"8px 14px",marginBottom:16,fontSize:12,color:C.danger}}>✗ Sync error: {syncResult.error}</div>}
+    {syncResult?.error&&<div style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,borderRadius:8,padding:"8px 14px",marginBottom:16,fontSize:12,color:COLORS.danger}}>✗ Sync error: {syncResult.error}</div>}
 
     {/* Setup prerequisites */}
-    <div style={{background:C.warningDim,border:`1px solid ${C.warning}44`,borderRadius:10,padding:"12px 14px",marginBottom:20}}>
-      <div style={{fontWeight:700,color:C.warning,fontSize:12,marginBottom:8}}>⚙ Before connecting — one-time Vercel setup</div>
+    <div style={{background:COLORS.warningDim,border:`1px solid ${COLORS.warning}44`,borderRadius:10,padding:"12px 14px",marginBottom:20}}>
+      <div style={{fontWeight:700,color:COLORS.warning,fontSize:12,marginBottom:8}}>⚙ Before connecting — one-time Vercel setup</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
         {[
           {label:"QB_CLIENT_ID",     desc:"From developer.intuit.com → your app → Keys & credentials"},
@@ -1869,41 +1869,41 @@ function BankSyncPanel({ entities }){
           {label:"KV_REST_API_URL",  desc:"From Vercel Dashboard → Storage → KV → Connect"},
           {label:"KV_REST_API_TOKEN",desc:"Same KV page — copy the REST token"},
         ].map(({label,desc})=>(
-          <div key={label} style={{background:C.bg,borderRadius:7,padding:"8px 10px"}}>
-            <div style={{fontFamily:"monospace",fontSize:11,color:C.warning,fontWeight:700,marginBottom:2}}>{label}</div>
-            <div style={{fontSize:10,color:C.textMid,lineHeight:1.4}}>{desc}</div>
+          <div key={label} style={{background:COLORS.bg,borderRadius:7,padding:"8px 10px"}}>
+            <div style={{fontFamily:"monospace",fontSize:11,color:COLORS.warning,fontWeight:700,marginBottom:2}}>{label}</div>
+            <div style={{fontSize:10,color:COLORS.textMid,lineHeight:1.4}}>{desc}</div>
           </div>
         ))}
       </div>
     </div>
 
     {/* Entity connection list */}
-    <div style={{fontSize:11,color:C.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>Connect Your QB Companies</div>
-    {loading&&<div style={{color:C.textMid,fontSize:12,padding:"20px 0"}}>Checking connections…</div>}
+    <div style={{fontSize:11,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>Connect Your QB Companies</div>
+    {loading&&<div style={{color:COLORS.textMid,fontSize:12,padding:"20px 0"}}>Checking connections…</div>}
     {!loading&&(
-      <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
+      <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,overflow:"hidden"}}>
         {(entities||DEFAULT_ENTITIES).map((ent,i)=>{
           const connected  = isConnected(ent.id);
           const reauth     = needsReauth(ent.id);
           const conn       = connections.find(c=>c.entityId===ent.id);
           return(
-            <div key={ent.id} style={{display:"flex",alignItems:"center",gap:14,padding:"13px 16px",borderBottom:i<(entities||DEFAULT_ENTITIES).length-1?`1px solid ${C.border}`:"none",transition:"background 0.12s"}}>
-              <div style={{width:10,height:10,borderRadius:"50%",background:connected?C.accent:reauth?C.warning:C.textDim,flexShrink:0}}/>
+            <div key={ent.id} style={{display:"flex",alignItems:"center",gap:14,padding:"13px 16px",borderBottom:i<(entities||DEFAULT_ENTITIES).length-1?`1px solid ${COLORS.border}`:"none",transition:"background 0.12s"}}>
+              <div style={{width:10,height:10,borderRadius:"50%",background:connected?COLORS.accent:reauth?COLORS.warning:COLORS.textDim,flexShrink:0}}/>
               <div style={{flex:1}}>
-                <div style={{fontSize:13,color:C.text,fontWeight:600}}>{ent.name}</div>
-                <div style={{fontSize:11,color:C.textMid,marginTop:2}}>
+                <div style={{fontSize:13,color:COLORS.text,fontWeight:600}}>{ent.name}</div>
+                <div style={{fontSize:11,color:COLORS.textMid,marginTop:2}}>
                   {connected ? `Connected · realmId: ${conn?.realmId||"—"}`
                   : reauth   ? "⚠ Token expired — please reconnect"
                   :             "Not connected"}
                 </div>
               </div>
-              <Badge color={connected?C.accent:reauth?C.warning:C.textDim}>
+              <Badge color={connected?COLORS.accent:reauth?COLORS.warning:COLORS.textDim}>
                 {connected?"Connected":reauth?"Needs Reauth":"Not Connected"}
               </Badge>
               {connected&&!reauth?(
-                <button onClick={()=>disconnect(ent.id)} style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,color:C.danger,borderRadius:7,padding:"6px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>Disconnect</button>
+                <button onClick={()=>disconnect(ent.id)} style={{background:COLORS.dangerDim,border:`1px solid ${COLORS.danger}33`,color:COLORS.danger,borderRadius:7,padding:"6px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>Disconnect</button>
               ):(
-                <button onClick={()=>connect(ent.id)} style={{background:reauth?C.warningDim:C.accentDim,border:`1px solid ${reauth?C.warning:C.accent}44`,color:reauth?C.warning:C.accent,borderRadius:7,padding:"6px 14px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                <button onClick={()=>connect(ent.id)} style={{background:reauth?COLORS.warningDim:COLORS.accentDim,border:`1px solid ${reauth?COLORS.warning:COLORS.accent}44`,color:reauth?COLORS.warning:COLORS.accent,borderRadius:7,padding:"6px 14px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
                   {reauth?"Reconnect":"Connect QB"}
                 </button>
               )}
@@ -1915,17 +1915,17 @@ function BankSyncPanel({ entities }){
 
     {/* How it works */}
     <div style={{marginTop:22}}>
-      <div style={{fontSize:11,color:C.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>How the sync works</div>
+      <div style={{fontSize:11,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>How the sync works</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
         {[
           {icon:"🔐",title:"OAuth 2.0",desc:"You click Connect → Intuit login → approve → token stored securely in Vercel KV. Your QB password never touches this app."},
           {icon:"⬇",title:"Delta sync",desc:"Each sync only pulls transactions newer than the last sync date. No duplicates, no full re-pulls. Fast and efficient."},
           {icon:"🔄",title:"Auto token refresh",desc:"Access tokens expire in 1 hour but refresh silently. Refresh tokens last 101 days — you'll get a reminder when re-auth is needed."},
         ].map(({icon,title,desc})=>(
-          <div key={title} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"13px 14px"}}>
+          <div key={title} style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:10,padding:"13px 14px"}}>
             <div style={{fontSize:20,marginBottom:8}}>{icon}</div>
-            <div style={{fontWeight:700,fontSize:12,color:C.text,marginBottom:5}}>{title}</div>
-            <div style={{fontSize:11,color:C.textMid,lineHeight:1.6}}>{desc}</div>
+            <div style={{fontWeight:700,fontSize:12,color:COLORS.text,marginBottom:5}}>{title}</div>
+            <div style={{fontSize:11,color:COLORS.textMid,lineHeight:1.6}}>{desc}</div>
           </div>
         ))}
       </div>
