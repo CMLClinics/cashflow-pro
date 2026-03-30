@@ -11,7 +11,7 @@ const hashPw = async (pw) => {
 
 // Roles: "admin" = full access | "viewer" = read-only, no delete/settings
 const DEFAULT_USERS = [
-  { id:"u1", name:"Oleg", email:"oleg@canadamedlaser.ca", role:"admin", hash:"" },
+  { id:"u1", name:"Oleg", email:"olegc@canadamedlaser.ca", role:"admin", hash:"" },
 ];
 // Pre-set default passwords (SHA-256 of "Admin2026!" and "View2026!")
 // admin hash for "Admin2026!" — generated at build time
@@ -50,16 +50,6 @@ const addWeeks= (d,n) => addDays(d,n*7);
 const addMonths=(d,n) => { const x=new Date(d); x.setMonth(x.getMonth()+n); return x; };
 const parseD  = (s)  => new Date(s+"T00:00:00");
 const PALETTE = ["#4D9EFF","#00C896","#A78BFA","#F0A500","#FF6B9D","#22D3EE","#FF4D4D","#34D399","#F472B6","#60A5FA"];
-
-// balColor: returns red if balance is below -overdraft, otherwise normal green/amber/red
-// overdraftLimit: the allowed negative buffer (e.g. 5000 means balance can go to -5000 before red)
-const balColor = (balance, overdraftLimit = 0) => {
-  const floor = -(Math.abs(overdraftLimit));
-  if (balance < floor) return C.danger;          // below overdraft limit → RED
-  if (balance < 0)     return C.warning;          // negative but within overdraft → AMBER
-  if (balance < 5000)  return C.warning;          // low positive → AMBER
-  return C.accent;                                 // healthy → GREEN
-};
 const TODAY_STR = dateStr(TODAY);
 
 function expandRecurring(proj) {
@@ -101,16 +91,16 @@ const DEFAULT_ENTITIES = [
   {id:"yeco",name:"YECO Marketing",              short:"YECO", color:"#FF6B9D"},
 ];
 const DEFAULT_ACCOUNTS = [
-  {id:"a1", entityId:"cml", name:"RBC Operations",        number:"****4821",openBalance:48200, overdraft:10000},
-  {id:"a2", entityId:"cml", name:"TD Payroll",            number:"****7734",openBalance:12500, overdraft:5000 },
-  {id:"a3", entityId:"cml", name:"RBC Reserve",           number:"****2290",openBalance:85000, overdraft:0    },
-  {id:"a4", entityId:"cmlf",name:"BMO Main",              number:"****3310",openBalance:31000, overdraft:10000},
-  {id:"a5", entityId:"cmlf",name:"BMO Trust",             number:"****9901",openBalance:60000, overdraft:0    },
-  {id:"a6", entityId:"ssb", name:"Scotiabank Chequing",   number:"****1147",openBalance:18400, overdraft:5000 },
-  {id:"a7", entityId:"ssb", name:"Scotiabank HST Reserve",number:"****5566",openBalance:7800,  overdraft:0    },
-  {id:"a8", entityId:"acad",name:"RBC Chequing",          number:"****8823",openBalance:22100, overdraft:3000 },
-  {id:"a9", entityId:"yeco",name:"TD Chequing",           number:"****6612",openBalance:9400,  overdraft:2000 },
-  {id:"a10",entityId:"yeco",name:"TD Ad Spend",           number:"****0043",openBalance:15000, overdraft:0    },
+  {id:"a1", entityId:"cml", name:"RBC Operations",        number:"****4821",openBalance:48200},
+  {id:"a2", entityId:"cml", name:"TD Payroll",            number:"****7734",openBalance:12500},
+  {id:"a3", entityId:"cml", name:"RBC Reserve",           number:"****2290",openBalance:85000},
+  {id:"a4", entityId:"cmlf",name:"BMO Main",              number:"****3310",openBalance:31000},
+  {id:"a5", entityId:"cmlf",name:"BMO Trust",             number:"****9901",openBalance:60000},
+  {id:"a6", entityId:"ssb", name:"Scotiabank Chequing",   number:"****1147",openBalance:18400},
+  {id:"a7", entityId:"ssb", name:"Scotiabank HST Reserve",number:"****5566",openBalance:7800 },
+  {id:"a8", entityId:"acad",name:"RBC Chequing",          number:"****8823",openBalance:22100},
+  {id:"a9", entityId:"yeco",name:"TD Chequing",           number:"****6612",openBalance:9400 },
+  {id:"a10",entityId:"yeco",name:"TD Ad Spend",           number:"****0043",openBalance:15000},
 ];
 
 function genTxns(account, entity, categories) {
@@ -482,12 +472,6 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
     return availAccounts.reduce((s,a)=>s+(a.openBalance||0),0);
   },[filterAccount,availAccounts,accounts]);
 
-  // Combined overdraft limit for current filter (sum when multiple accounts)
-  const overdraftLimit = useMemo(()=>{
-    if(filterAccount!=="all") return accounts.find(a=>a.id===filterAccount)?.overdraft??0;
-    return availAccounts.reduce((s,a)=>s+(a.overdraft||0),0);
-  },[filterAccount,availAccounts,accounts]);
-
   // Filtered actual txns
   const filteredActuals = useMemo(()=>actualTxns.filter(t=>
     (filterEntity==="all"||t.entityId===filterEntity)&&
@@ -691,13 +675,13 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
           <SectionHead title="Overview" sub={entities.find(e=>e.id===filterEntity)?.name||"All entities"} />
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(155px,1fr))",gap:10,marginBottom:22}}>
             <KpiCard label="Opening Balance"    value={fmtShort(kpi.opening)}     color={C.textMid}/>
-            <KpiCard label="Current Balance"    value={fmtShort(kpi.current)}     color={balColor(kpi.current, overdraftLimit)}/>
+            <KpiCard label="Current Balance"    value={fmtShort(kpi.current)}     color={kpi.current>=0?C.accent:C.danger}/>
             <KpiCard label="Actual In (20d)"    value={fmtShort(kpi.actualIn)}    color={C.accent}/>
             <KpiCard label="Actual Out (20d)"   value={fmtShort(kpi.actualOut)}   color={C.danger}/>
             <KpiCard label="Projected In"       value={fmtShort(kpi.projectedIn)} color={C.blue}/>
             <KpiCard label="Projected Out"      value={fmtShort(kpi.projectedOut)}color={C.warning}/>
-            <KpiCard label="Ending Balance"     value={fmtShort(kpi.ending)}      color={balColor(kpi.ending, overdraftLimit)}
-              sub={kpi.minBal < -(overdraftLimit) ? `⚠ Below overdraft: ${fmtShort(kpi.minBal)}` : kpi.minBal<0?`⚠ Low: ${fmtShort(kpi.minBal)}`:null}/>
+            <KpiCard label="Ending Balance"     value={fmtShort(kpi.ending)}      color={kpi.ending>=10000?C.accent:kpi.ending>=0?C.warning:C.danger}
+              sub={kpi.minBal<0?`⚠ Low: ${fmtShort(kpi.minBal)}`:null}/>
           </div>
           <div style={{marginBottom:22}}>
             <div style={{fontSize:11,color:C.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>Entities</div>
@@ -721,7 +705,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
             </div>
           </div>
           {/* Mini ledger preview */}
-          <UnifiedLedgerTable rows={displayLedger.slice(0,15)} entities={entities} categories={categories} accounts={accounts} title="Recent Ledger" onMore={()=>setTab("transactions")} overdraftLimit={overdraftLimit}/>
+          <UnifiedLedgerTable rows={displayLedger.slice(0,15)} entities={entities} categories={categories} accounts={accounts} title="Recent Ledger" onMore={()=>setTab("transactions")} />
         </>)}
 
         {/* ══════════════════════════════════════════════════════════════════
@@ -861,7 +845,6 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
             onToggleSelect={isAdmin?toggleSelect:null}
             onToggleSelectAll={isAdmin?toggleSelectAll:null}
             onDeleteSingle={isAdmin?askDeleteSingle:null}
-            overdraftLimit={overdraftLimit}
           />
 
           {/* Totals bar */}
@@ -897,10 +880,9 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:18}}>
             <KpiCard label="Opening Balance"  value={fmtShort(kpi.opening)} color={C.textMid}/>
-            <KpiCard label="Current Balance"  value={fmtShort(kpi.current)} color={balColor(kpi.current, overdraftLimit)}/>
-            <KpiCard label={`Ending (+${forecastDays}d)`} value={fmtShort(kpi.ending)} color={balColor(kpi.ending, overdraftLimit)}/>
-            <KpiCard label="Lowest Point"     value={fmtShort(kpi.minBal)} color={balColor(kpi.minBal, overdraftLimit)}
-              sub={overdraftLimit>0?`Overdraft limit: ${fmtShort(overdraftLimit)}`:undefined}/>
+            <KpiCard label="Current Balance"  value={fmtShort(kpi.current)} color={kpi.current>=0?C.accent:C.danger}/>
+            <KpiCard label={`Ending (+${forecastDays}d)`} value={fmtShort(kpi.ending)} color={kpi.ending>=10000?C.accent:kpi.ending>=0?C.warning:C.danger}/>
+            <KpiCard label="Lowest Point"     value={fmtShort(kpi.minBal)} color={kpi.minBal<0?C.danger:kpi.minBal<5000?C.warning:C.accent}/>
           </div>
 
           {/* SVG Chart */}
@@ -916,17 +898,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
                 const v=cMin+p*cRange, y=toY(v);
                 return <g key={p}><line x1={44} y1={y} x2={W-10} y2={y} stroke={C.border} strokeDasharray="2,5"/><text x={40} y={y+4} textAnchor="end" fontSize={8} fill={C.textDim}>{fmtShort(v).replace("CA","").replace(",000","k")}</text></g>;
               })}
-              {cMin<0&&<line x1={44} y1={toY(0)} x2={W-10} y2={toY(0)} stroke={C.warning} strokeWidth={1} strokeDasharray="3,3"/>}
-              {/* Overdraft floor line */}
-              {overdraftLimit>0&&(()=>{
-                const floorVal = -overdraftLimit;
-                if(floorVal < cMin || floorVal > cMax) return null;
-                const y = toY(floorVal);
-                return <g>
-                  <line x1={44} y1={y} x2={W-10} y2={y} stroke={C.danger} strokeWidth={1.5} strokeDasharray="6,3"/>
-                  <text x={W-12} y={y-4} textAnchor="end" fontSize={8} fill={C.danger} fontWeight="bold">Overdraft limit</text>
-                </g>;
-              })()}
+              {cMin<0&&<line x1={44} y1={toY(0)} x2={W-10} y2={toY(0)} stroke={C.danger} strokeWidth={1} strokeDasharray="3,3"/>}
 
               {/* TODAY shaded band */}
               {todayIdx>=0&&(()=>{
@@ -957,8 +929,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
                 if(!d.hasActivity&&!d.isToday) return null;
                 const x=toX(i),y=toY(d.balance);
                 if(d.isToday) return <circle key={i} cx={x} cy={y} r={5} fill={C.warning} stroke={C.bg} strokeWidth={2}/>;
-                const dotColor = d.balance < -(overdraftLimit) ? C.danger : d.isProjected ? C.blue : C.accent;
-                return <circle key={i} cx={x} cy={y} r={3} fill={dotColor} stroke={C.bg} strokeWidth={1.5}/>;
+                return <circle key={i} cx={x} cy={y} r={3} fill={d.isProjected?C.blue:C.accent} stroke={C.bg} strokeWidth={1.5}/>;
               })}
 
               {/* X labels */}
@@ -967,13 +938,8 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
                 return <text key={i} x={toX(i)} y={H+14} textAnchor="middle" fontSize={7} fill={d.isToday?C.warning:C.textDim}>{d.date.slice(5)}</text>;
               })}
             </svg>
-            <div style={{display:"flex",gap:18,marginTop:8,paddingLeft:44,flexWrap:"wrap"}}>
-              {[
-                {c:C.accent,l:"Actual balance"},
-                {c:C.blue,l:"Projected",dash:true},
-                {c:C.warning,l:"Today"},
-                ...(overdraftLimit>0?[{c:C.danger,l:`Overdraft limit (${fmtShort(overdraftLimit)})`,dash:true}]:[]),
-              ].map(({c,l,dash})=>(
+            <div style={{display:"flex",gap:18,marginTop:8,paddingLeft:44}}>
+              {[{c:C.accent,l:"Actual balance"},{c:C.blue,l:"Projected",dash:true},{c:C.warning,l:"Today"}].map(({c,l,dash})=>(
                 <div key={l} style={{display:"flex",alignItems:"center",gap:5}}>
                   <div style={{width:16,height:2,background:dash?"transparent":c,backgroundImage:dash?`repeating-linear-gradient(90deg,${c},${c} 4px,transparent 4px,transparent 7px)`:"none"}}/>
                   <span style={{fontSize:10,color:C.textMid}}>{l}</span>
@@ -1001,7 +967,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
 // UNIFIED LEDGER TABLE
 // ─────────────────────────────────────────────────────────────────────────────
 function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore, showAll,
-  selectedIds, onToggleSelect, onToggleSelectAll, onDeleteSingle, overdraftLimit=0}) {
+  selectedIds, onToggleSelect, onToggleSelectAll, onDeleteSingle}) {
 
   const canDelete = !!onToggleSelect; // only in full transactions tab
   const COLS = canDelete
@@ -1122,7 +1088,7 @@ function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore
 
               {/* Running balance */}
               <span style={{textAlign:"right",fontWeight:800,fontFamily:"monospace",fontSize:13,
-                color:balColor(row.runBalance, overdraftLimit),
+                color:row.runBalance<0?C.danger:row.runBalance<5000?C.warning:C.accent,
                 opacity:isProj?0.8:1}}>
                 {fmtCAD(row.runBalance)}
               </span>
@@ -1276,80 +1242,26 @@ function EntitiesSettings({entities,setEntities}){
 }
 
 function AccountsSettings({accounts,setAccounts,entities}){
-  const blank={entityId:entities[0]?.id||"",name:"",number:"",openBalance:"",overdraft:""};
+  const blank={entityId:entities[0]?.id||"",name:"",number:"",openBalance:""};
   const [form,setForm]=useState(blank);const [editId,setEditId]=useState(null);
-  const save=()=>{
-    if(!form.name||!form.entityId)return;
-    const ent=entities.find(e=>e.id===form.entityId);
-    const a={...form,openBalance:parseFloat(form.openBalance)||0,overdraft:parseFloat(form.overdraft)||0,color:ent?.color||C.textMid};
-    if(editId){setAccounts(p=>p.map(x=>x.id===editId?{...a,id:editId}:x));setEditId(null);}
-    else setAccounts(p=>[...p,{...a,id:uid()}]);
-    setForm(blank);
-  };
-  const startEdit=(a)=>{setForm({entityId:a.entityId,name:a.name,number:a.number,openBalance:String(a.openBalance),overdraft:String(a.overdraft||0)});setEditId(a.id);};
+  const save=()=>{if(!form.name||!form.entityId)return;const ent=entities.find(e=>e.id===form.entityId);const a={...form,openBalance:parseFloat(form.openBalance)||0,color:ent?.color||C.textMid};if(editId){setAccounts(p=>p.map(x=>x.id===editId?{...a,id:editId}:x));setEditId(null);}else setAccounts(p=>[...p,{...a,id:uid()}]);setForm(blank);};
+  const startEdit=(a)=>{setForm({entityId:a.entityId,name:a.name,number:a.number,openBalance:String(a.openBalance)});setEditId(a.id);};
   const del=(id)=>{setAccounts(p=>p.filter(a=>a.id!==id));if(editId===id){setEditId(null);setForm(blank);}};
   return(<div>
     <div style={{background:C.surface,border:`1px solid ${editId?C.blue+"55":C.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
       <div style={{fontSize:12,fontWeight:700,color:editId?C.blue:C.accent,marginBottom:14}}>{editId?"✏ Edit Account":"＋ New Account"}</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr 90px",gap:10,alignItems:"end"}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 90px",gap:10,alignItems:"end"}}>
         <Fld label="Entity"><select style={selS} value={form.entityId} onChange={e=>setForm(f=>({...f,entityId:e.target.value}))}>{entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></Fld>
         <Fld label="Account Name"><input style={inpS} placeholder="RBC Operations" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
         <Fld label="Account # (masked)"><input style={inpS} placeholder="****4821" value={form.number} onChange={e=>setForm(f=>({...f,number:e.target.value}))}/></Fld>
-        <Fld label="Opening Balance (CAD)"><input style={inpS} type="number" placeholder="0.00" value={form.openBalance} onChange={e=>setForm(f=>({...f,openBalance:e.target.value}))}/></Fld>
-        <Fld label="Overdraft Limit (CAD)">
-          <div style={{position:"relative"}}>
-            <input style={{...inpS,borderColor:form.overdraft&&parseFloat(form.overdraft)>0?C.danger+"66":C.border}} type="number" placeholder="0 = none" value={form.overdraft} onChange={e=>setForm(f=>({...f,overdraft:e.target.value}))}/>
-            {form.overdraft&&parseFloat(form.overdraft)>0&&<span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",fontSize:9,color:C.danger,fontWeight:700,pointerEvents:"none"}}>−{fmtShort(parseFloat(form.overdraft))}</span>}
-          </div>
-        </Fld>
-        <div style={{display:"flex",gap:6,alignItems:"flex-end"}}>
-          <button onClick={save} style={{flex:1,background:editId?C.blue:C.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>
-          {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}
-        </div>
-      </div>
-      {/* Overdraft explanation */}
-      <div style={{marginTop:12,padding:"8px 12px",background:C.dangerDim,border:`1px solid ${C.danger}22`,borderRadius:7,fontSize:11,color:C.textMid,lineHeight:1.5}}>
-        <span style={{color:C.danger,fontWeight:700}}>Overdraft limit</span> — the maximum amount the bank allows you to go below zero. E.g. enter 5000 if your bank allows −$5,000. Balance turns <span style={{color:C.danger,fontWeight:700}}>red</span> when it drops below this limit, <span style={{color:C.warning,fontWeight:700}}>amber</span> when it dips negative but is within the limit.
+        <Fld label="Opening Balance"><input style={inpS} type="number" placeholder="0.00" value={form.openBalance} onChange={e=>setForm(f=>({...f,openBalance:e.target.value}))}/></Fld>
+        <div style={{display:"flex",gap:6,alignItems:"flex-end"}}><button onClick={save} style={{flex:1,background:editId?C.blue:C.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>{editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}</div>
       </div>
     </div>
-
-    {/* Accounts table */}
     <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
-      {entities.map(ent=>{
-        const eAccs=accounts.filter(a=>a.entityId===ent.id);
-        if(!eAccs.length) return null;
-        return(
-          <div key={ent.id}>
-            <div style={{padding:"7px 14px",background:C.surfaceHigh,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:7}}>
-              <Dot color={ent.color} size={8}/>
-              <span style={{fontSize:11,color:ent.color,fontWeight:700}}>{ent.name}</span>
-              <span style={{fontSize:10,color:C.textDim,marginLeft:"auto"}}>Total: {fmtShort(eAccs.reduce((s,a)=>s+(a.openBalance||0),0))}</span>
-            </div>
-            {eAccs.map(a=>(
-              <div key={a.id} className="rh" style={{display:"grid",gridTemplateColumns:"100px 1fr 120px 130px 120px 100px",gap:10,padding:"9px 14px",alignItems:"center",borderBottom:`1px solid ${C.border}`,transition:"background 0.12s"}}>
-                <Badge color={ent.color}>{ent.short}</Badge>
-                <span style={{fontSize:13,color:C.text}}>{a.name}</span>
-                <span style={{fontSize:12,fontFamily:"monospace",color:C.textMid}}>{a.number}</span>
-                <span style={{fontSize:13,fontWeight:700,fontFamily:"monospace",color:C.accent}}>{fmtCAD(a.openBalance||0)}</span>
-                <div style={{display:"flex",alignItems:"center",gap:6}}>
-                  {(a.overdraft||0)>0
-                    ? <span style={{fontSize:12,fontFamily:"monospace",fontWeight:700,color:C.danger}}>−{fmtShort(a.overdraft)}</span>
-                    : <span style={{fontSize:11,color:C.textDim}}>No overdraft</span>
-                  }
-                </div>
-                <div style={{display:"flex",gap:5}}>
-                  <button onClick={()=>startEdit(a)} style={{background:C.blueDim,border:`1px solid ${C.blue}33`,color:C.blue,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button>
-                  <button onClick={()=>del(a.id)} style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,color:C.danger,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-      })}
+      {entities.map(ent=>{const eAccs=accounts.filter(a=>a.entityId===ent.id);if(!eAccs.length)return null;return(<div key={ent.id}><div style={{padding:"7px 14px",background:C.surfaceHigh,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:7}}><Dot color={ent.color} size={8}/><span style={{fontSize:11,color:ent.color,fontWeight:700}}>{ent.name}</span><span style={{fontSize:10,color:C.textDim,marginLeft:"auto"}}>Total: {fmtShort(eAccs.reduce((s,a)=>s+(a.openBalance||0),0))}</span></div>{eAccs.map(a=><div key={a.id} className="rh" style={{display:"grid",gridTemplateColumns:"110px 1fr 130px 150px 100px",gap:10,padding:"9px 14px",alignItems:"center",borderBottom:`1px solid ${C.border}`,transition:"background 0.12s"}}><Badge color={ent.color}>{ent.short}</Badge><span style={{fontSize:13,color:C.text}}>{a.name}</span><span style={{fontSize:12,fontFamily:"monospace",color:C.textMid}}>{a.number}</span><span style={{fontSize:13,fontWeight:700,fontFamily:"monospace",color:C.accent}}>{fmtCAD(a.openBalance||0)}</span><div style={{display:"flex",gap:5}}><button onClick={()=>startEdit(a)} style={{background:C.blueDim,border:`1px solid ${C.blue}33`,color:C.blue,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Edit</button><button onClick={()=>del(a.id)} style={{background:C.dangerDim,border:`1px solid ${C.danger}33`,color:C.danger,borderRadius:5,padding:"3px 8px",fontSize:10,cursor:"pointer",fontWeight:700}}>Del</button></div></div>)}</div>);})}
       {accounts.length===0&&<Empty msg="No accounts."/>}
     </div>
-    {/* Column header for accounts table */}
-    <style>{`.acc-hdr{display:grid;grid-template-columns:100px 1fr 120px 130px 120px 100px;gap:10px;padding:8px 14px;background:${C.surfaceHigh};border-bottom:1px solid ${C.border}}`}</style>
   </div>);
 }
 
