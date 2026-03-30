@@ -1018,10 +1018,10 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
               {/* Date range */}
               <span style={{fontSize:11,color:COLORS.textMid}}>From</span>
               <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}
-                style={{...inpS(),width:130,padding:"5px 9px"}}/>
+                style={{...inpS(),width:140,padding:"5px 9px",colorScheme:"dark"}}/>
               <span style={{fontSize:11,color:COLORS.textMid}}>To</span>
               <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}
-                style={{...inpS(),width:130,padding:"5px 9px"}}/>
+                style={{...inpS(),width:140,padding:"5px 9px",colorScheme:"dark"}}/>
               {(dateFrom||dateTo)&&<button onClick={()=>{setDateFrom("");setDateTo("");}} style={{background:"#161E2A",border:`1px solid ${COLORS.border}`,color:COLORS.textMid,borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer"}}>✕ Clear</button>}
               <div style={{width:1,background:COLORS.border,margin:"0 4px",height:20}}/>
               {["all","actual","projected"].map(f=>(
@@ -1227,9 +1227,11 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
 // MONTHLY CASHFLOW BY CATEGORY REPORT
 // ─────────────────────────────────────────────────────────────────────────────
 function MonthlyCategoryReport({ actualTxns, projections, categories, openingBalance }) {
-  const [reportType, setReportType] = useState("both");
-  const [reportFrom, setReportFrom] = useState(dateStr(addMonths(TODAY, -5)).slice(0,7));
-  const [reportTo,   setReportTo]   = useState(dateStr(addMonths(TODAY,  6)).slice(0,7));
+  const [reportType,  setReportType]  = useState("both");
+  const [reportFrom,  setReportFrom]  = useState(dateStr(addMonths(TODAY, -5)).slice(0,7));
+  const [reportTo,    setReportTo]    = useState(dateStr(addMonths(TODAY,  6)).slice(0,7));
+  const [hiddenCats,  setHiddenCats]  = useState(new Set()); // category IDs to exclude
+  const toggleCat = (id) => setHiddenCats(prev => { const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; });
 
   // Build month list between reportFrom and reportTo
   const monthList = useMemo(() => {
@@ -1280,9 +1282,9 @@ function MonthlyCategoryReport({ actualTxns, projections, categories, openingBal
         const total = Object.values(monthly).reduce((s,v)=>s+v, 0);
         return { cat, monthly, total };
       })
-      .filter(r => r.cat)
+      .filter(r => r.cat && !hiddenCats.has(r.cat.id))
       .sort((a,b) => Math.abs(b.total) - Math.abs(a.total));
-  }, [actualTxns, projOccs, categories, monthList, reportType]);
+  }, [actualTxns, projOccs, categories, monthList, reportType, hiddenCats]);
 
   // Monthly net + running balance
   const { monthlyNet, monthlyOpenBal, monthlyCloseBal } = useMemo(() => {
@@ -1310,28 +1312,62 @@ function MonthlyCategoryReport({ actualTxns, projections, categories, openingBal
 
   const maxAbs = Math.max(...data.flatMap(r => monthList.map(m => Math.abs(r.monthly[m.key]||0))), 1);
   const GCOLS = `180px repeat(${monthList.length}, 1fr) 110px`;
+  const incomeRows  = data.filter(r=>r.cat.type==="income");
+  const expenseRows = data.filter(r=>r.cat.type==="expense");
+  const allCats = categories.filter(c => reportType==="both"||c.type===reportType);
 
-  const Cell = ({val, bold, dim}) => {
-    const color = val===0 ? "#344558" : val>0 ? "#00C896" : "#FF4D4D";
+  function Cell({val,bold}) {
+    const color = val===0?"#344558":val>0?"#00C896":"#FF4D4D";
     return <div style={{padding:"8px 6px",textAlign:"right"}}>
-      <span style={{fontSize:11,fontFamily:"monospace",fontWeight:bold?800:600,color:dim?"#6B8299":color}}>
-        {val===0?"—":(val>0?"+":"")+fmtShort(val)}
-      </span>
+      <span style={{fontSize:11,fontFamily:"monospace",fontWeight:bold?800:600,color}}>{val===0?"—":(val>0?"+":"")+fmtShort(val)}</span>
     </div>;
-  };
+  }
+
+  function CatRows({rows,label,color}) {
+    if(!rows.length) return null;
+    return <>
+      <div style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,background:color+"11",borderBottom:`1px solid ${color}33`,minWidth:600}}>
+        <div style={{padding:"6px 14px",fontSize:10,color,fontWeight:800,textTransform:"uppercase",letterSpacing:"0.1em"}}>{label}</div>
+        {monthList.map(m=><div key={m.key}/>)}<div/>
+      </div>
+      {rows.map(({cat,monthly,total})=>(
+        <div key={cat.id} className="rh" style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,borderBottom:`1px solid ${COLORS.border}`,minWidth:600,transition:"background 0.12s"}}>
+          <div style={{padding:"9px 14px",display:"flex",alignItems:"center",gap:7}}>
+            <Dot color={cat.color} size={7}/>
+            <span style={{fontSize:12,color:COLORS.text,fontWeight:500}}>{cat.name}</span>
+          </div>
+          {monthList.map(m=>{
+            const val=monthly[m.key]||0;
+            const barW=val!==0?Math.max(3,Math.round((Math.abs(val)/maxAbs)*60)):0;
+            const isPos=val>=0;
+            const hasProj=projOccs.some(o=>o.occDate.slice(0,7)===m.key&&o.categoryId===cat.id);
+            return (
+              <div key={m.key} style={{padding:"9px 6px",textAlign:"right",position:"relative",borderLeft:hasProj?`2px dashed ${COLORS.blue}33`:"none"}}>
+                {barW>0&&<div style={{position:"absolute",bottom:4,right:6,height:3,width:barW,background:isPos?COLORS.accent+"55":COLORS.danger+"55",borderRadius:2}}/>}
+                <span style={{fontSize:11,fontFamily:"monospace",fontWeight:600,color:val===0?"#344558":isPos?COLORS.accent:COLORS.danger}}>
+                  {val===0?"—":(isPos?"+":"")+fmtShort(val)}
+                </span>
+              </div>
+            );
+          })}
+          <div style={{padding:"9px 14px",textAlign:"right"}}>
+            <span style={{fontSize:11,fontFamily:"monospace",fontWeight:800,color:total>=0?COLORS.accent:COLORS.danger}}>{total>=0?"+":""}{fmtShort(total)}</span>
+          </div>
+        </div>
+      ))}
+    </>;
+  }
 
   return (
     <div style={{animation:"fadein 0.25s ease"}}>
       {/* Controls */}
-      <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
+      <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:14,flexWrap:"wrap"}}>
         <span style={{fontSize:11,color:COLORS.textMid}}>From</span>
-        <input type="month" value={reportFrom} onChange={e=>setReportFrom(e.target.value)}
-          style={{...inpS(),width:140,padding:"5px 9px"}}/>
+        <input type="month" value={reportFrom} onChange={e=>setReportFrom(e.target.value)} style={{...inpS(),width:140,padding:"5px 9px",colorScheme:"dark"}}/>
         <span style={{fontSize:11,color:COLORS.textMid}}>To</span>
-        <input type="month" value={reportTo} onChange={e=>setReportTo(e.target.value)}
-          style={{...inpS(),width:140,padding:"5px 9px"}}/>
+        <input type="month" value={reportTo} onChange={e=>setReportTo(e.target.value)} style={{...inpS(),width:140,padding:"5px 9px",colorScheme:"dark"}}/>
         <div style={{width:1,background:COLORS.border,height:18}}/>
-        {[{k:"both",l:"Income & Expense"},{k:"income",l:"Income"},{k:"expense",l:"Expense"}].map(({k,l})=>(
+        {[{k:"both",l:"All"},{k:"income",l:"Income"},{k:"expense",l:"Expense"}].map(({k,l})=>(
           <button key={k} onClick={()=>setReportType(k)} style={{background:reportType===k?COLORS.accentDim:"transparent",color:reportType===k?COLORS.accent:COLORS.textMid,border:`1px solid ${reportType===k?COLORS.accent+"44":COLORS.border}`,borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>
         ))}
         <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8,fontSize:11,color:COLORS.textMid}}>
@@ -1340,21 +1376,35 @@ function MonthlyCategoryReport({ actualTxns, projections, categories, openingBal
         </div>
       </div>
 
+      {/* Category checkboxes */}
+      <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:10,padding:"10px 14px",marginBottom:14}}>
+        <div style={{fontSize:10,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.09em",marginBottom:8}}>Categories — uncheck to hide</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+          {allCats.map(cat=>(
+            <label key={cat.id} style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",padding:"3px 8px",borderRadius:6,background:hiddenCats.has(cat.id)?"transparent":cat.color+"15",border:`1px solid ${hiddenCats.has(cat.id)?COLORS.border:cat.color+"44"}`,opacity:hiddenCats.has(cat.id)?0.4:1,transition:"all 0.15s"}}>
+              <input type="checkbox" checked={!hiddenCats.has(cat.id)} onChange={()=>toggleCat(cat.id)} style={{width:12,height:12,accentColor:cat.color,cursor:"pointer"}}/>
+              <Dot color={cat.color} size={6}/>
+              <span style={{fontSize:11,color:COLORS.text}}>{cat.name}</span>
+              <span style={{fontSize:9,color:cat.type==="income"?COLORS.accent:COLORS.danger,fontWeight:700}}>{cat.type==="income"?"▲":"▼"}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
       {/* Table */}
       <div style={{background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:12,overflow:"auto"}}>
-        {/* Header */}
         <div style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,background:"#161E2A",borderBottom:`1px solid ${COLORS.border}`,minWidth:600}}>
           <div style={{padding:"8px 14px",fontSize:10,color:"#7A96B0",textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:600}}>Category</div>
           {monthList.map(m=>(
             <div key={m.key} style={{padding:"8px 6px",textAlign:"right"}}>
-              <div style={{fontSize:10,color:"#7A96B0",fontWeight:600,letterSpacing:"0.06em"}}>{m.label}</div>
+              <div style={{fontSize:10,color:"#7A96B0",fontWeight:600}}>{m.label}</div>
               <div style={{fontSize:8,color:m.isPast?COLORS.accent:COLORS.blue,fontWeight:700,textTransform:"uppercase",marginTop:1}}>{m.isPast?"Actual":"Forecast"}</div>
             </div>
           ))}
-          <div style={{padding:"8px 14px",fontSize:10,color:"#7A96B0",textTransform:"uppercase",letterSpacing:"0.07em",fontWeight:600,textAlign:"right"}}>Total</div>
+          <div style={{padding:"8px 14px",fontSize:10,color:"#7A96B0",textTransform:"uppercase",fontWeight:600,textAlign:"right"}}>Total</div>
         </div>
 
-        {/* Opening balance row */}
+        {/* Opening balance */}
         <div style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,borderBottom:`1px solid ${COLORS.border}`,background:"#0E1828",minWidth:600}}>
           <div style={{padding:"7px 14px",fontSize:11,color:COLORS.textMid,fontWeight:700,fontStyle:"italic"}}>Opening Balance</div>
           {monthList.map(m=>(
@@ -1362,56 +1412,19 @@ function MonthlyCategoryReport({ actualTxns, projections, categories, openingBal
               <span style={{fontSize:11,fontFamily:"monospace",fontWeight:700,color:balColor(monthlyOpenBal[m.key]||0,0)}}>{fmtShort(monthlyOpenBal[m.key]||0)}</span>
             </div>
           ))}
-          <div style={{padding:"7px 14px"}}/>
+          <div/>
         </div>
 
         {data.length===0&&<Empty msg="No data for selected period."/>}
+        <CatRows rows={incomeRows} label="Income" color={COLORS.accent}/>
+        <CatRows rows={expenseRows} label="Expenses" color={COLORS.danger}/>
 
-        {/* Category rows */}
-        {data.map(({cat,monthly,total})=>(
-          <div key={cat.id} className="rh" style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,borderBottom:`1px solid ${COLORS.border}`,minWidth:600,transition:"background 0.12s"}}>
-            <div style={{padding:"9px 14px",display:"flex",alignItems:"center",gap:7}}>
-              <Dot color={cat.color} size={7}/>
-              <span style={{fontSize:12,color:COLORS.text,fontWeight:500}}>{cat.name}</span>
-              <span style={{fontSize:9,color:cat.type==="income"?COLORS.accent:COLORS.danger,fontWeight:700}}>{cat.type==="income"?"▲":"▼"}</span>
-            </div>
-            {monthList.map(m=>{
-              const val = monthly[m.key]||0;
-              const barW = val!==0?Math.max(3,Math.round((Math.abs(val)/maxAbs)*60)):0;
-              const isPos=val>=0;
-              // Check if this cell has projected data
-              const hasProj = projOccs.some(o=>o.occDate.slice(0,7)===m.key&&o.categoryId===cat.id);
-              return (
-                <div key={m.key} style={{padding:"9px 6px",textAlign:"right",position:"relative",borderLeft:hasProj?`2px dashed ${COLORS.blue}33`:"none"}}>
-                  {barW>0&&<div style={{position:"absolute",bottom:4,right:6,height:3,width:barW,background:isPos?COLORS.accent+"55":COLORS.danger+"55",borderRadius:2}}/>}
-                  <span style={{fontSize:11,fontFamily:"monospace",fontWeight:600,color:val===0?"#344558":isPos?COLORS.accent:COLORS.danger}}>
-                    {val===0?"—":(isPos?"+":"")+fmtShort(val)}
-                  </span>
-                </div>
-              );
-            })}
-            <div style={{padding:"9px 14px",textAlign:"right"}}>
-              <span style={{fontSize:11,fontFamily:"monospace",fontWeight:800,color:total>=0?COLORS.accent:COLORS.danger}}>
-                {total>=0?"+":""}{fmtShort(total)}
-              </span>
-            </div>
-          </div>
-        ))}
-
-        {/* Net cash flow row */}
-        {data.length>0&&(
+        {data.length>0&&<>
           <div style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,borderTop:`1px solid ${COLORS.borderMid}`,background:"#0E1828",minWidth:600}}>
             <div style={{padding:"9px 14px",fontSize:12,fontWeight:800,color:COLORS.text}}>Net Cash Flow</div>
-            {monthList.map(m=>{
-              const val=monthlyNet[m.key]||0;
-              return <Cell key={m.key} val={val} bold/>;
-            })}
+            {monthList.map(m=><Cell key={m.key} val={monthlyNet[m.key]||0} bold/>)}
             <Cell val={Object.values(monthlyNet).reduce((s,v)=>s+v,0)} bold/>
           </div>
-        )}
-
-        {/* Closing balance row */}
-        {data.length>0&&(
           <div style={{display:"grid",gridTemplateColumns:GCOLS,gap:0,borderTop:`2px solid ${COLORS.border}`,background:"#0E1828",minWidth:600}}>
             <div style={{padding:"9px 14px",fontSize:12,fontWeight:800,color:COLORS.text,fontStyle:"italic"}}>Closing Balance</div>
             {monthList.map(m=>(
@@ -1419,9 +1432,9 @@ function MonthlyCategoryReport({ actualTxns, projections, categories, openingBal
                 <span style={{fontSize:12,fontFamily:"monospace",fontWeight:800,color:balColor(monthlyCloseBal[m.key]||0,0)}}>{fmtShort(monthlyCloseBal[m.key]||0)}</span>
               </div>
             ))}
-            <div style={{padding:"9px 14px"}}/>
+            <div/>
           </div>
-        )}
+        </>}
       </div>
 
       {/* Bar chart */}
@@ -1430,11 +1443,10 @@ function MonthlyCategoryReport({ actualTxns, projections, categories, openingBal
           <div style={{fontSize:11,color:COLORS.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.09em",marginBottom:14}}>Monthly Net + Closing Balance</div>
           <div style={{display:"flex",gap:6,alignItems:"flex-end",height:90}}>
             {monthList.map(m=>{
-              const net  = monthlyNet[m.key]||0;
-              const close= monthlyCloseBal[m.key]||0;
-              const maxNet = Math.max(...monthList.map(mm=>Math.abs(monthlyNet[mm.key]||0)),1);
-              const h = Math.max(4,Math.round((Math.abs(net)/maxNet)*70));
-              const isPos = net>=0;
+              const net=monthlyNet[m.key]||0,close=monthlyCloseBal[m.key]||0;
+              const maxNet=Math.max(...monthList.map(mm=>Math.abs(monthlyNet[mm.key]||0)),1);
+              const h=Math.max(4,Math.round((Math.abs(net)/maxNet)*70));
+              const isPos=net>=0;
               return (
                 <div key={m.key} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
                   <div style={{fontSize:8,color:balColor(close,0),fontWeight:700,fontFamily:"monospace"}}>{fmtShort(close).replace("CA","").replace(",000","k")}</div>
@@ -1450,6 +1462,8 @@ function MonthlyCategoryReport({ actualTxns, projections, categories, openingBal
     </div>
   );
 }
+
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UNIFIED LEDGER TABLE
