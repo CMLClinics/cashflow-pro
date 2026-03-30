@@ -11,7 +11,7 @@ const hashPw = async (pw) => {
 
 // Roles: "admin" = full access | "viewer" = read-only, no delete/settings
 const DEFAULT_USERS = [
-  { id:"u1", name:"Oleg", email:"oleg@canadamedlaser.ca", role:"admin", hash:"" },
+  { id:"u1", name:"Oleg", email:"olegc@canadamedlaser.ca", role:"admin", hash:"" },
 ];
 // Pre-set default passwords (SHA-256 of "Admin2026!" and "View2026!")
 // admin hash for "Admin2026!" — generated at build time
