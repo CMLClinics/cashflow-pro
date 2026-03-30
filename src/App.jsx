@@ -139,30 +139,30 @@ const DEFAULT_PROJECTIONS = [
 // ─────────────────────────────────────────────────────────────────────────────
 // PRIMITIVES
 // ─────────────────────────────────────────────────────────────────────────────
-const inpS = ()=>({background:C.bg,border:`1px solid ${C.border}`,borderRadius:7,padding:"8px 11px",color:C.text,fontSize:13,width:"100%",fontFamily:"inherit",outline:"none"});
+const inpS = ()=>({background:"#0A0E14",border:"1px solid #1E2D40",borderRadius:7,padding:"8px 11px",color:"#E8F0FC",fontSize:13,width:"100%",fontFamily:"inherit",outline:"none"});
 const selS = ()=>({...inpS()});
-const Badge= ({children,color=C.accent})=><span style={{fontSize:10,fontWeight:700,letterSpacing:"0.07em",textTransform:"uppercase",padding:"2px 8px",borderRadius:99,background:color+"22",color,border:`1px solid ${color}33`,whiteSpace:"nowrap"}}>{children}</span>;
-const Dot  = ({color,size=8})=><span style={{display:"inline-block",width:size,height:size,borderRadius:"50%",background:color,flexShrink:0}}/>;
-const Fld  = ({label,children})=><div><div style={{fontSize:10,color:C.textDim,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:700,marginBottom:5}}>{label}</div>{children}</div>;
-const Empty= ({msg})=><div style={{padding:"36px 20px",textAlign:"center",color:C.textDim,fontSize:13}}>{msg}</div>;
+function Badge({children,color}){ const c=color||"#00C896"; return <span style={{fontSize:10,fontWeight:700,letterSpacing:"0.07em",textTransform:"uppercase",padding:"2px 8px",borderRadius:99,background:c+"22",color:c,border:`1px solid ${c}33`,whiteSpace:"nowrap"}}>{children}</span>; }
+function Dot({color,size}){ return <span style={{display:"inline-block",width:size||8,height:size||8,borderRadius:"50%",background:color,flexShrink:0}}/>; }
+function Fld({label,children}){ return <div><div style={{fontSize:10,color:"#2A3D55",textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:700,marginBottom:5}}>{label}</div>{children}</div>; }
+function Empty({msg}){ return <div style={{padding:"36px 20px",textAlign:"center",color:"#2A3D55",fontSize:13}}>{msg}</div>; }
 
 function ColHdr({cols,labels}){
-  return <div style={{display:"grid",gridTemplateColumns:cols,gap:10,padding:"8px 14px",borderBottom:`1px solid ${C.border}`,background:"#161E2A"}}>
+  return <div style={{display:"grid",gridTemplateColumns:cols,gap:10,padding:"8px 14px",borderBottom:"1px solid #1E2D40",background:"#161E2A"}}>
     {labels.map(l=><span key={l} style={{fontSize:10,color:"#7A96B0",textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:600}}>{l}</span>)}
   </div>;
 }
-function KpiCard({label,value,color=C.accent,sub}){
-  return <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"12px 14px"}}>
-    <div style={{fontSize:10,color:C.textMid,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:700,marginBottom:4}}>{label}</div>
-    <div style={{fontSize:20,fontWeight:800,color,fontFamily:"'Space Grotesk',monospace",letterSpacing:"-0.02em"}}>{value}</div>
-    {sub&&<div style={{fontSize:11,color:C.textMid,marginTop:3}}>{sub}</div>}
+function KpiCard({label,value,color,sub}){
+  return <div style={{background:"#111820",border:"1px solid #1E2D40",borderRadius:10,padding:"12px 14px"}}>
+    <div style={{fontSize:10,color:"#6B8299",textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:700,marginBottom:4}}>{label}</div>
+    <div style={{fontSize:20,fontWeight:800,color:color||"#00C896",fontFamily:"'Space Grotesk',monospace",letterSpacing:"-0.02em"}}>{value}</div>
+    {sub&&<div style={{fontSize:11,color:"#6B8299",marginTop:3}}>{sub}</div>}
   </div>;
 }
 function SectionHead({title,sub,action}){
   return <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
     <div>
-      <h2 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:18,fontWeight:800,letterSpacing:"-0.02em",color:C.text,margin:0}}>{title}</h2>
-      {sub&&<p style={{color:C.textMid,fontSize:12,marginTop:3,margin:0}}>{sub}</p>}
+      <h2 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:18,fontWeight:800,letterSpacing:"-0.02em",color:"#E8F0FC",margin:0}}>{title}</h2>
+      {sub&&<p style={{color:"#6B8299",fontSize:12,marginTop:3,margin:0}}>{sub}</p>}
     </div>
     {action}
   </div>;
