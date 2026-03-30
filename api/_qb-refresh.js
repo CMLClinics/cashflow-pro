@@ -2,7 +2,8 @@
 // Refreshes an expired QB access token using the refresh_token.
 // Returns updated tokenData, already saved to KV.
 
-import { kv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
+const kv = new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN });
 
 export async function refreshTokenIfNeeded(tokenData) {
   const clientId     = process.env.QB_CLIENT_ID;

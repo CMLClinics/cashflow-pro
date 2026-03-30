@@ -3,7 +3,8 @@
 // Exchanges auth code for access_token + refresh_token.
 // Stores tokens in Vercel KV (key-value store).
 
-import { kv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
+const kv = new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN });
 
 export default async function handler(req, res) {
   const { code, state, realmId, error } = req.query;

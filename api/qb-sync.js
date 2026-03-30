@@ -3,7 +3,8 @@
 // Called by the frontend "Sync QB" button.
 // Returns { transactions: [...], errors: [...] }
 
-import { kv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
+const kv = new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN });
 import { refreshTokenIfNeeded } from "./_qb-refresh.js";
 
 const QB_BASE = "https://quickbooks.api.intuit.com";

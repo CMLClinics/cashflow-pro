@@ -1,7 +1,8 @@
 // api/qb-disconnect.js
 // Removes a QB company connection (deletes stored tokens).
 
-import { kv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
+const kv = new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN });
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });

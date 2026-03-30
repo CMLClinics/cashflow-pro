@@ -2,7 +2,8 @@
 // Returns list of connected QB companies with their connection status.
 // Frontend calls this on load to show green/red dots in Settings → Bank Sync.
 
-import { kv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
+const kv = new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN });
 
 export default async function handler(req, res) {
   try {
