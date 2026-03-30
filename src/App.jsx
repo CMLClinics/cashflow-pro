@@ -53,15 +53,14 @@ const parseD  = (s)  => new Date(s+"T00:00:00");
 const PALETTE = ["#4D9EFF","#00C896","#A78BFA","#F0A500","#FF6B9D","#22D3EE","#FF4D4D","#34D399","#F472B6","#60A5FA"];
 const TODAY_STR = dateStr(TODAY);
 
-// balColor: returns red if balance is below -overdraft, otherwise normal green/amber/red
-// overdraftLimit: the allowed negative buffer (e.g. 5000 means balance can go to -5000 before red)
-const balColor = (balance, overdraftLimit = 0) => {
-  const floor = -(Math.abs(overdraftLimit));
-  if (balance < floor) return C.danger;
-  if (balance < 0)     return C.warning;
-  if (balance < 5000)  return C.warning;
-  return C.accent;
-};
+function balColor(balance, overdraftLimit) {
+  const lim = overdraftLimit || 0;
+  const floor = -(Math.abs(lim));
+  if (balance < floor) return "#FF4D4D";
+  if (balance < 0)     return "#F0A500";
+  if (balance < 5000)  return "#F0A500";
+  return "#00C896";
+}
 
 function expandRecurring(proj) {
   if (proj.recurrence==="once") return [{...proj, occDate:proj.startDate, occId:proj.id+"_0"}];
@@ -140,8 +139,8 @@ const DEFAULT_PROJECTIONS = [
 // ─────────────────────────────────────────────────────────────────────────────
 // PRIMITIVES
 // ─────────────────────────────────────────────────────────────────────────────
-const inpS = {background:C.bg,border:`1px solid ${C.border}`,borderRadius:7,padding:"8px 11px",color:C.text,fontSize:13,width:"100%",fontFamily:"inherit",outline:"none"};
-const selS = {...inpS};
+const inpS = ()=>({background:C.bg,border:`1px solid ${C.border}`,borderRadius:7,padding:"8px 11px",color:C.text,fontSize:13,width:"100%",fontFamily:"inherit",outline:"none"});
+const selS = ()=>({...inpS()});
 const Badge= ({children,color=C.accent})=><span style={{fontSize:10,fontWeight:700,letterSpacing:"0.07em",textTransform:"uppercase",padding:"2px 8px",borderRadius:99,background:color+"22",color,border:`1px solid ${color}33`,whiteSpace:"nowrap"}}>{children}</span>;
 const Dot  = ({color,size=8})=><span style={{display:"inline-block",width:size,height:size,borderRadius:"50%",background:color,flexShrink:0}}/>;
 const Fld  = ({label,children})=><div><div style={{fontSize:10,color:C.textDim,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:700,marginBottom:5}}>{label}</div>{children}</div>;
@@ -475,10 +474,10 @@ function UserManagement({ users, saveUsers, currentUser }) {
       <div style={{background:C.surface,border:`1px solid ${editId?C.blue+"55":C.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
         <div style={{fontSize:12,fontWeight:700,color:editId?C.blue:C.accent,marginBottom:14}}>{editId?"✏ Edit User":"＋ Add User"}</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 100px",gap:10,alignItems:"end"}}>
-          <Fld label="Full Name"><input style={inpS} placeholder="Jane Smith" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
-          <Fld label="Email"><input style={inpS} type="email" placeholder="jane@company.ca" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))}/></Fld>
+          <Fld label="Full Name"><input style={inpS()} placeholder="Jane Smith" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
+          <Fld label="Email"><input style={inpS()} type="email" placeholder="jane@company.ca" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))}/></Fld>
           <Fld label="Role">
-            <select style={selS} value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))}>
+            <select style={selS()} value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))}>
               <option value="admin">Admin — full access</option>
               <option value="viewer">Viewer — read only</option>
             </select>
@@ -852,12 +851,12 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
           </div>
         </div>
         <span style={{fontSize:10,color:C.textDim,textTransform:"uppercase",letterSpacing:"0.08em"}}>Entity</span>
-        <select value={filterEntity} onChange={e=>setFilterEntity(e.target.value)} style={{...selS,width:200,padding:"5px 9px"}}>
+        <select value={filterEntity} onChange={e=>setFilterEntity(e.target.value)} style={{...selS(),width:200,padding:"5px 9px"}}>
           <option value="all">All Entities</option>
           {entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
         </select>
         <span style={{fontSize:10,color:C.textDim,textTransform:"uppercase",letterSpacing:"0.08em"}}>Account</span>
-        <select value={filterAccount} onChange={e=>setFilterAccount(e.target.value)} style={{...selS,width:195,padding:"5px 9px"}}>
+        <select value={filterAccount} onChange={e=>setFilterAccount(e.target.value)} style={{...selS(),width:195,padding:"5px 9px"}}>
           <option value="all">All Accounts</option>
           {availAccounts.map(a=><option key={a.id} value={a.id}>{a.name} {a.number}</option>)}
         </select>
@@ -1043,10 +1042,10 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
               {/* Date range */}
               <span style={{fontSize:11,color:C.textMid}}>From</span>
               <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}
-                style={{...inpS,width:130,padding:"5px 9px"}}/>
+                style={{...inpS(),width:130,padding:"5px 9px"}}/>
               <span style={{fontSize:11,color:C.textMid}}>To</span>
               <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}
-                style={{...inpS,width:130,padding:"5px 9px"}}/>
+                style={{...inpS(),width:130,padding:"5px 9px"}}/>
               {(dateFrom||dateTo)&&<button onClick={()=>{setDateFrom("");setDateTo("");}} style={{background:C.surfaceHigh,border:`1px solid ${C.border}`,color:C.textMid,borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer"}}>✕ Clear</button>}
               <div style={{width:1,background:C.border,margin:"0 4px",height:20}}/>
               {["all","actual","projected"].map(f=>(
@@ -1590,19 +1589,19 @@ function ProjectionsTab({projections,setProjections,filteredProjOccs,entities,ac
     <div style={{background:C.surface,border:`1px solid ${editId?C.blue+"55":C.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
       <div style={{fontSize:12,fontWeight:700,color:editId?C.blue:C.accent,marginBottom:14}}>{editId?"✏ Edit Rule":"＋ New Rule"}</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:10}}>
-        <Fld label="Entity"><select style={selS} value={form.entityId} onChange={e=>setForm(f=>({...f,entityId:e.target.value}))}>{entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></Fld>
-        <Fld label="Account"><select style={selS} value={form.accountId} onChange={e=>setForm(f=>({...f,accountId:e.target.value}))}>{formAccs.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></Fld>
-        <Fld label="Type"><select style={selS} value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}><option value="income">Collection / Income</option><option value="expense">Expense / Payment</option></select></Fld>
-        <Fld label="Category"><select style={selS} value={form.categoryId} onChange={e=>setForm(f=>({...f,categoryId:e.target.value}))}>{categories.filter(c=>c.type===form.type).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></Fld>
+        <Fld label="Entity"><select style={selS()} value={form.entityId} onChange={e=>setForm(f=>({...f,entityId:e.target.value}))}>{entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></Fld>
+        <Fld label="Account"><select style={selS()} value={form.accountId} onChange={e=>setForm(f=>({...f,accountId:e.target.value}))}>{formAccs.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></Fld>
+        <Fld label="Type"><select style={selS()} value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}><option value="income">Collection / Income</option><option value="expense">Expense / Payment</option></select></Fld>
+        <Fld label="Category"><select style={selS()} value={form.categoryId} onChange={e=>setForm(f=>({...f,categoryId:e.target.value}))}>{categories.filter(c=>c.type===form.type).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></Fld>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:10,marginBottom:10}}>
-        <Fld label="Description"><input style={inpS} placeholder="e.g. Monthly Payroll" value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></Fld>
-        <Fld label="Amount (CAD)"><input style={inpS} type="number" placeholder="0.00" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))}/></Fld>
-        <Fld label="Recurrence"><select style={selS} value={form.recurrence} onChange={e=>setForm(f=>({...f,recurrence:e.target.value}))}><option value="once">One-time</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></Fld>
+        <Fld label="Description"><input style={inpS()} placeholder="e.g. Monthly Payroll" value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></Fld>
+        <Fld label="Amount (CAD)"><input style={inpS()} type="number" placeholder="0.00" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))}/></Fld>
+        <Fld label="Recurrence"><select style={selS()} value={form.recurrence} onChange={e=>setForm(f=>({...f,recurrence:e.target.value}))}><option value="once">One-time</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></Fld>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,alignItems:"end"}}>
-        <Fld label={form.recurrence==="once"?"Date":"Start Date"}><input style={inpS} type="date" value={form.startDate} onChange={e=>setForm(f=>({...f,startDate:e.target.value}))}/></Fld>
-        {form.recurrence!=="once"&&<Fld label="End Date"><input style={inpS} type="date" value={form.endDate} onChange={e=>setForm(f=>({...f,endDate:e.target.value}))}/></Fld>}
+        <Fld label={form.recurrence==="once"?"Date":"Start Date"}><input style={inpS()} type="date" value={form.startDate} onChange={e=>setForm(f=>({...f,startDate:e.target.value}))}/></Fld>
+        {form.recurrence!=="once"&&<Fld label="End Date"><input style={inpS()} type="date" value={form.endDate} onChange={e=>setForm(f=>({...f,endDate:e.target.value}))}/></Fld>}
         <div style={{gridColumn:form.recurrence==="once"?"2/4":"3/5",display:"flex",gap:8,alignItems:"flex-end"}}>
           <button onClick={save} style={{flex:1,background:editId?C.blue:C.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:13,cursor:"pointer"}}>{editId?"Save Changes":"Add Rule"}</button>
           {editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"9px 12px",fontSize:12,cursor:"pointer"}}>Cancel</button>}
@@ -1670,8 +1669,8 @@ function EntitiesSettings({entities,setEntities}){
     <div style={{background:C.surface,border:`1px solid ${editId?C.blue+"55":C.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
       <div style={{fontSize:12,fontWeight:700,color:editId?C.blue:C.accent,marginBottom:14}}>{editId?"✏ Edit Entity":"＋ New Entity"}</div>
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 160px 90px",gap:10,alignItems:"end"}}>
-        <Fld label="Company Name"><input style={inpS} placeholder="Canada MedLaser Inc" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
-        <Fld label="Short Code"><input style={inpS} placeholder="CML" value={form.short} onChange={e=>setForm(f=>({...f,short:e.target.value.toUpperCase().slice(0,6)}))}/></Fld>
+        <Fld label="Company Name"><input style={inpS()} placeholder="Canada MedLaser Inc" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
+        <Fld label="Short Code"><input style={inpS()} placeholder="CML" value={form.short} onChange={e=>setForm(f=>({...f,short:e.target.value.toUpperCase().slice(0,6)}))}/></Fld>
         <Fld label="Colour"><div style={{display:"flex",gap:5,flexWrap:"wrap",paddingTop:2}}>{PALETTE.map(p=><div key={p} onClick={()=>setForm(f=>({...f,color:p}))} style={{width:22,height:22,borderRadius:"50%",background:p,cursor:"pointer",border:form.color===p?`3px solid ${C.text}`:`2px solid ${C.bg}`}}/>)}</div></Fld>
         <div style={{display:"flex",gap:6,alignItems:"flex-end"}}><button onClick={save} style={{flex:1,background:editId?C.blue:C.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>{editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}</div>
       </div>
@@ -1701,13 +1700,13 @@ function AccountsSettings({accounts,setAccounts,entities}){
     <div style={{background:C.surface,border:`1px solid ${editId?C.blue+"55":C.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
       <div style={{fontSize:12,fontWeight:700,color:editId?C.blue:C.accent,marginBottom:14}}>{editId?"✏ Edit Account":"＋ New Account"}</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr 90px",gap:10,alignItems:"end"}}>
-        <Fld label="Entity"><select style={selS} value={form.entityId} onChange={e=>setForm(f=>({...f,entityId:e.target.value}))}>{entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></Fld>
-        <Fld label="Account Name"><input style={inpS} placeholder="RBC Operations" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
-        <Fld label="Account # (masked)"><input style={inpS} placeholder="****4821" value={form.number} onChange={e=>setForm(f=>({...f,number:e.target.value}))}/></Fld>
-        <Fld label="Opening Balance (CAD)"><input style={inpS} type="number" placeholder="0.00" value={form.openBalance} onChange={e=>setForm(f=>({...f,openBalance:e.target.value}))}/></Fld>
+        <Fld label="Entity"><select style={selS()} value={form.entityId} onChange={e=>setForm(f=>({...f,entityId:e.target.value}))}>{entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></Fld>
+        <Fld label="Account Name"><input style={inpS()} placeholder="RBC Operations" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
+        <Fld label="Account # (masked)"><input style={inpS()} placeholder="****4821" value={form.number} onChange={e=>setForm(f=>({...f,number:e.target.value}))}/></Fld>
+        <Fld label="Opening Balance (CAD)"><input style={inpS()} type="number" placeholder="0.00" value={form.openBalance} onChange={e=>setForm(f=>({...f,openBalance:e.target.value}))}/></Fld>
         <Fld label="Overdraft Limit (CAD)">
           <div style={{position:"relative"}}>
-            <input style={{...inpS,borderColor:form.overdraft&&parseFloat(form.overdraft)>0?C.danger+"66":C.border}} type="number" placeholder="0 = none" value={form.overdraft} onChange={e=>setForm(f=>({...f,overdraft:e.target.value}))}/>
+            <input style={{...inpS(),borderColor:form.overdraft&&parseFloat(form.overdraft)>0?C.danger+"66":C.border}} type="number" placeholder="0 = none" value={form.overdraft} onChange={e=>setForm(f=>({...f,overdraft:e.target.value}))}/>
             {form.overdraft&&parseFloat(form.overdraft)>0&&<span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",fontSize:9,color:C.danger,fontWeight:700,pointerEvents:"none"}}>−{fmtShort(parseFloat(form.overdraft))}</span>}
           </div>
         </Fld>
@@ -1772,8 +1771,8 @@ function CategoriesSettings({categories,setCategories}){
     <div style={{background:C.surface,border:`1px solid ${editId?C.blue+"55":C.accent+"44"}`,borderRadius:12,padding:18,marginBottom:20}}>
       <div style={{fontSize:12,fontWeight:700,color:editId?C.blue:C.accent,marginBottom:14}}>{editId?"✏ Edit Category":"＋ New Category"}</div>
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 160px 90px",gap:10,alignItems:"end"}}>
-        <Fld label="Name"><input style={inpS} placeholder="Franchise Fees" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
-        <Fld label="Type"><select style={selS} value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}><option value="income">Income</option><option value="expense">Expense</option></select></Fld>
+        <Fld label="Name"><input style={inpS()} placeholder="Franchise Fees" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></Fld>
+        <Fld label="Type"><select style={selS()} value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}><option value="income">Income</option><option value="expense">Expense</option></select></Fld>
         <Fld label="Colour"><div style={{display:"flex",gap:5,flexWrap:"wrap",paddingTop:2}}>{PALETTE.map(p=><div key={p} onClick={()=>setForm(f=>({...f,color:p}))} style={{width:20,height:20,borderRadius:"50%",background:p,cursor:"pointer",border:form.color===p?`3px solid ${C.text}`:`2px solid ${C.bg}`}}/>)}</div></Fld>
         <div style={{display:"flex",gap:6,alignItems:"flex-end"}}><button onClick={save} style={{flex:1,background:editId?C.blue:C.accent,color:"#000",border:"none",borderRadius:7,padding:"9px 0",fontWeight:700,fontSize:12,cursor:"pointer"}}>{editId?"Save":"Add"}</button>{editId&&<button onClick={()=>{setEditId(null);setForm(blank);}} style={{background:C.surfaceHigh,color:C.textMid,border:`1px solid ${C.border}`,borderRadius:7,padding:"9px 8px",fontSize:12,cursor:"pointer"}}>✕</button>}</div>
       </div>
