@@ -533,38 +533,13 @@ function UserManagement({ users, saveUsers, currentUser }) {
 function CashFlowPro({ session, onLogout, users, saveUsers }) {
   const isAdmin = session?.user?.role === "admin";
 
-  // ── Load persisted data or fall back to defaults ──────────────────────────
-  const loadData = () => {
-    try {
-      const raw = localStorage.getItem(DATA_KEY);
-      if (raw) {
-        const d = JSON.parse(raw);
-        return {
-          entities:    d.entities    || DEFAULT_ENTITIES,
-          accounts:    d.accounts    || DEFAULT_ACCOUNTS,
-          categories:  d.categories  || DEFAULT_CATEGORIES,
-          projections: d.projections || DEFAULT_PROJECTIONS,
-          actualTxns:  d.actualTxns  || DEFAULT_ACCOUNTS.flatMap(acc=>{const e=DEFAULT_ENTITIES.find(x=>x.id===acc.entityId);return e?genTxns(acc,e,DEFAULT_CATEGORIES):[];}),
-          skippedOccs: new Set(d.skippedOccs||[]),
-        };
-      }
-    } catch(e){}
-    return {
-      entities:    DEFAULT_ENTITIES,
-      accounts:    DEFAULT_ACCOUNTS,
-      categories:  DEFAULT_CATEGORIES,
-      projections: DEFAULT_PROJECTIONS,
-      actualTxns:  DEFAULT_ACCOUNTS.flatMap(acc=>{const e=DEFAULT_ENTITIES.find(x=>x.id===acc.entityId);return e?genTxns(acc,e,DEFAULT_CATEGORIES):[];}),
-      skippedOccs: new Set(),
-    };
-  };
-
-  const initData = loadData();
-  const [entities,   setEntities]   = useState(initData.entities);
-  const [accounts,   setAccounts]   = useState(initData.accounts);
-  const [categories, setCategories] = useState(initData.categories);
-  const [projections,setProjections]= useState(initData.projections);
-  const [actualTxns, setActualTxns] = useState(initData.actualTxns);
+  // ── Load persisted data safely inside useState initializers ──────────────
+  const [entities,   setEntities]   = useState(()=>{ try{ const d=JSON.parse(localStorage.getItem(DATA_KEY)||"{}"); return d.entities||DEFAULT_ENTITIES; }catch(e){ return DEFAULT_ENTITIES; } });
+  const [accounts,   setAccounts]   = useState(()=>{ try{ const d=JSON.parse(localStorage.getItem(DATA_KEY)||"{}"); return d.accounts||DEFAULT_ACCOUNTS; }catch(e){ return DEFAULT_ACCOUNTS; } });
+  const [categories, setCategories] = useState(()=>{ try{ const d=JSON.parse(localStorage.getItem(DATA_KEY)||"{}"); return d.categories||DEFAULT_CATEGORIES; }catch(e){ return DEFAULT_CATEGORIES; } });
+  const [projections,setProjections]= useState(()=>{ try{ const d=JSON.parse(localStorage.getItem(DATA_KEY)||"{}"); return d.projections||DEFAULT_PROJECTIONS; }catch(e){ return DEFAULT_PROJECTIONS; } });
+  const [actualTxns, setActualTxns] = useState(()=>{ try{ const d=JSON.parse(localStorage.getItem(DATA_KEY)||"{}"); return d.actualTxns||(DEFAULT_ACCOUNTS.flatMap(acc=>{const e=DEFAULT_ENTITIES.find(x=>x.id===acc.entityId);return e?genTxns(acc,e,DEFAULT_CATEGORIES):[];})); }catch(e){ return DEFAULT_ACCOUNTS.flatMap(acc=>{const ent=DEFAULT_ENTITIES.find(x=>x.id===acc.entityId);return ent?genTxns(acc,ent,DEFAULT_CATEGORIES):[];}); } });
+  const [skippedOccs,setSkippedOccs]= useState(()=>{ try{ const d=JSON.parse(localStorage.getItem(DATA_KEY)||"{}"); return new Set(d.skippedOccs||[]); }catch(e){ return new Set(); } });
 
   // ── Auto-save all data to localStorage on any change ─────────────────────
   useEffect(()=>{
@@ -613,7 +588,6 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
   // ── Delete state ─────────────────────────────────────────────────────────
   const [selectedIds,   setSelectedIds]   = useState(new Set());
   const [confirmModal,  setConfirmModal]  = useState(null);
-  const [skippedOccs,   setSkippedOccs]  = useState(initData.skippedOccs);
 
   const toggleSelect = (id) => setSelectedIds(prev => {
     const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
