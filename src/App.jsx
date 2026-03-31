@@ -565,6 +565,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
   const [qbConnectMsg,  setQbConnectMsg]  = useState(null);
   const [syncing,       setSyncing]       = useState(false);
   const [syncMsg,       setSyncMsg]       = useState(null);
+  const [syncFromDate,  setSyncFromDate]  = useState(TODAY_STR);
 
   // Detect QB OAuth callback redirect (?qb_connected=entityId)
   useEffect(()=>{
@@ -732,7 +733,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
       const res  = await fetch("/api/qb-sync", {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
-          sinceDate: dateStr(addDays(TODAY,-90)),
+          sinceDate: syncFromDate || TODAY_STR,
           accounts: accounts.map(a=>({id:a.id, entityId:a.entityId, qbAccountId:a.qbAccountId||null})),
         }),
       });
@@ -841,10 +842,17 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
         </select>
         <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}>
           {syncMsg&&<span style={{fontSize:11,color:COLORS.accent,background:COLORS.accentDim,padding:"4px 11px",borderRadius:6,border:`1px solid ${COLORS.accent}33`}}>✓ {syncMsg}</span>}
-          {isAdmin&&<button onClick={handleSync} disabled={syncing} style={{background:COLORS.qb,color:"#fff",border:"none",borderRadius:7,padding:"7px 15px",fontSize:12,fontWeight:700,cursor:syncing?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:6,opacity:syncing?0.7:1}}>
-            <span style={{display:"inline-block",animation:syncing?"spin 1s linear infinite":"none"}}>{syncing?"⟳":"⬇"}</span>
-            {syncing?"Syncing...":"Sync QB"}
-          </button>}
+          {isAdmin&&<>
+            <div style={{display:"flex",alignItems:"center",gap:6,background:COLORS.surface,border:`1px solid ${COLORS.border}`,borderRadius:7,padding:"4px 8px"}}>
+              <span style={{fontSize:10,color:COLORS.textMid,whiteSpace:"nowrap"}}>From</span>
+              <input type="date" value={syncFromDate} onChange={e=>setSyncFromDate(e.target.value)}
+                style={{background:"transparent",border:"none",color:COLORS.text,fontSize:11,outline:"none",colorScheme:"dark",width:110,cursor:"pointer"}}/>
+            </div>
+            <button onClick={handleSync} disabled={syncing} style={{background:COLORS.qb,color:"#fff",border:"none",borderRadius:7,padding:"7px 15px",fontSize:12,fontWeight:700,cursor:syncing?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:6,opacity:syncing?0.7:1}}>
+              <span style={{display:"inline-block",animation:syncing?"spin 1s linear infinite":"none"}}>{syncing?"⟳":"⬇"}</span>
+              {syncing?"Syncing...":"Sync QB"}
+            </button>
+          </>}
           {/* User avatar + logout */}
           <div style={{display:"flex",alignItems:"center",gap:8,borderLeft:`1px solid ${COLORS.border}`,paddingLeft:12,marginLeft:4}}>
             <div style={{width:30,height:30,borderRadius:"50%",background:session?.user?.role==="admin"?COLORS.accent+"22":COLORS.blue+"22",border:`1px solid ${session?.user?.role==="admin"?COLORS.accent+"44":COLORS.blue+"44"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:session?.user?.role==="admin"?COLORS.accent:COLORS.blue}}>
@@ -1072,9 +1080,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
             onToggleSelectAll={isAdmin?toggleSelectAll:null}
             onDeleteSingle={isAdmin?askDeleteSingle:null}
             onCatAssign={(txnId, catId)=>{
-              setData(d=>({...d, transactions: d.transactions.map(t=>
-                t.id===txnId ? {...t, categoryId:catId} : t
-              )}));
+              setActualTxns(prev=>prev.map(t=>t.id===txnId?{...t,categoryId:catId}:t));
             }}
             overdraftLimit={overdraftLimit}
           />
