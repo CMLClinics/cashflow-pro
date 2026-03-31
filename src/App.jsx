@@ -732,7 +732,7 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
       const res  = await fetch("/api/qb-sync", {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
-          sinceDate: dateStr(addDays(TODAY,-30)),
+          sinceDate: dateStr(addDays(TODAY,-90)),
           accounts: accounts.map(a=>({id:a.id, entityId:a.entityId, qbAccountId:a.qbAccountId||null})),
         }),
       });
@@ -1071,6 +1071,11 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
             onToggleSelect={isAdmin?toggleSelect:null}
             onToggleSelectAll={isAdmin?toggleSelectAll:null}
             onDeleteSingle={isAdmin?askDeleteSingle:null}
+            onCatAssign={(txnId, catId)=>{
+              setData(d=>({...d, transactions: d.transactions.map(t=>
+                t.id===txnId ? {...t, categoryId:catId} : t
+              )}));
+            }}
             overdraftLimit={overdraftLimit}
           />
 
@@ -1516,14 +1521,14 @@ function MonthlyCategoryReport({ actualTxns, projections, categories, openingBal
 // UNIFIED LEDGER TABLE
 // ─────────────────────────────────────────────────────────────────────────────
 function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore, showAll,
-  selectedIds, onToggleSelect, onToggleSelectAll, onDeleteSingle, overdraftLimit=0}) {
+  selectedIds, onToggleSelect, onToggleSelectAll, onDeleteSingle, onCatAssign, overdraftLimit=0}) {
 
   const canDelete = !!onToggleSelect; // only in full transactions tab
   const COLS = canDelete
-    ? "32px 82px 64px 1fr 80px 90px 90px 140px 70px"
-    : "82px 64px 1fr 80px 90px 90px 140px 80px";
+    ? "32px 82px 70px 1fr 110px 100px 100px 130px 50px"
+    : "82px 70px 1fr 110px 100px 100px 130px 80px";
   const LABELS = canDelete
-    ? ["","Date","Entity","Description","Amount","Category","Status","Balance",""]
+    ? ["Date","Entity","Description","Amount","Category","Status","Balance",""]
     : ["Date","Entity","Description","Amount","Category","Status","Balance","Source"];
 
   // actual row ids in this view (for select-all)
@@ -1564,7 +1569,10 @@ function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore
               style={{width:14,height:14,cursor:"pointer",accentColor:COLORS.accent}}/>
           </div>
         )}
-        {LABELS.map(l=><span key={l} style={{fontSize:10,color:"#7A96B0",textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:600}}>{l}</span>)}
+        {LABELS.filter((_,i)=>!(canDelete&&i===0)).map((l,i)=>(
+          <span key={i} style={{fontSize:10,color:"#7A96B0",textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:600,
+            textAlign:(l==="Amount"||l==="Balance")?"right":"left"}}>{l}</span>
+        ))}
       </div>
 
       <div style={{maxHeight:showAll?620:380,overflowY:"auto"}}>
@@ -1623,12 +1631,29 @@ function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore
               </div>
 
               {/* Amount */}
-              <span style={{textAlign:"right",fontWeight:700,fontFamily:"monospace",fontSize:13,color:row.type==="income"?COLORS.accent:COLORS.danger}}>
-                {row.type==="income"?"+":"−"}{fmtShort(row.amount)}
+              <span style={{textAlign:"right",fontWeight:700,fontFamily:"monospace",fontSize:12,color:row.type==="income"?COLORS.accent:COLORS.danger}}>
+                {row.type==="income"?"+":"−"}{fmtCAD(row.amount)}
               </span>
 
-              {/* Category */}
-              <div>{cat&&<Badge color={cat.color}>{cat.name}</Badge>}</div>
+              {/* Category — inline picker if uncategorized */}
+              <div onClick={e=>e.stopPropagation()}>
+                {(!row.categoryId || row.categoryId==="") ? (
+                  <select
+                    defaultValue=""
+                    onChange={e=>{ if(e.target.value && onCatAssign) onCatAssign(row.id, e.target.value); }}
+                    style={{fontSize:10,background:"#1A0A00",border:`1px solid ${COLORS.warning}66`,color:COLORS.warning,borderRadius:6,padding:"2px 6px",cursor:"pointer",maxWidth:95}}>
+                    <option value="" disabled>⚠ Assign…</option>
+                    <optgroup label="── Income ──">
+                      {categories.filter(c=>c.type==="income").map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                    </optgroup>
+                    <optgroup label="── Expense ──">
+                      {categories.filter(c=>c.type==="expense").map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                    </optgroup>
+                  </select>
+                ) : (
+                  cat ? <Badge color={cat.color}>{cat.name}</Badge> : null
+                )}
+              </div>
 
               {/* Status */}
               <div>
