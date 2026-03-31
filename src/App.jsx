@@ -1079,8 +1079,13 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
             onToggleSelect={isAdmin?toggleSelect:null}
             onToggleSelectAll={isAdmin?toggleSelectAll:null}
             onDeleteSingle={isAdmin?askDeleteSingle:null}
-            onCatAssign={(txnId, catId)=>{
-              setActualTxns(prev=>prev.map(t=>t.id===txnId?{...t,categoryId:catId}:t));
+            onCatAssign={(txnId, catId, currentType)=>{
+              // Find the category to determine correct type
+              const cat = categories.find(c=>c.id===catId);
+              const newType = cat ? cat.type : currentType;
+              setActualTxns(prev=>prev.map(t=>
+                t.id===txnId ? {...t, categoryId:catId, type:newType} : t
+              ));
             }}
             overdraftLimit={overdraftLimit}
           />
@@ -1641,31 +1646,27 @@ function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore
                 {row.type==="income"?"+":"−"}{fmtCAD(row.amount)}
               </span>
 
-              {/* Category — inline picker if uncategorized */}
+              {/* Category — always-available dropdown, works for assigned and unassigned */}
               <div onClick={e=>e.stopPropagation()}>
-                {(!row.categoryId || row.categoryId==="") ? (
-                  <select
-                    value=""
-                    onChange={e=>{
-                      const catId = e.target.value;
-                      if(catId && onCatAssign) onCatAssign(row.id, catId);
-                    }}
-                    style={{fontSize:10,background:"#1A0A00",border:`1px solid ${COLORS.warning}88`,color:COLORS.warning,borderRadius:6,padding:"3px 7px",cursor:"pointer",maxWidth:100,fontWeight:700}}>
-                    <option value="" disabled>⚠ Set category</option>
-                    <optgroup label="── Income ──">
-                      {categories.filter(c=>c.type==="income").map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                    </optgroup>
-                    <optgroup label="── Expense ──">
-                      {categories.filter(c=>c.type==="expense").map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                    </optgroup>
-                  </select>
-                ) : (
-                  cat
-                    ? <div style={{cursor:"pointer"}} title="Click to change category" onClick={()=>{ if(onCatAssign){ const next=window.prompt("Change category ID (or leave to cancel):",row.categoryId); if(next&&next!==row.categoryId) onCatAssign(row.id,next); }}}>
-                        <Badge color={cat.color}>{cat.name}</Badge>
-                      </div>
-                    : <Badge color={COLORS.textDim}>Unknown</Badge>
-                )}
+                <select
+                  value={row.categoryId||""}
+                  onChange={e=>{ if(onCatAssign) onCatAssign(row.id, e.target.value, row.type); }}
+                  style={{
+                    fontSize:10,
+                    background: (!row.categoryId||row.categoryId==="") ? "#1A0A00" : "transparent",
+                    border: `1px solid ${(!row.categoryId||row.categoryId==="") ? COLORS.warning+"88" : COLORS.border}`,
+                    color: (!row.categoryId||row.categoryId==="") ? COLORS.warning : cat ? cat.color : COLORS.textMid,
+                    borderRadius:6, padding:"3px 7px", cursor:"pointer", maxWidth:105, fontWeight:700,
+                    outline:"none",
+                  }}>
+                  <option value="" disabled>{(!row.categoryId||row.categoryId==="")?"⚠ Set category":"— category —"}</option>
+                  <optgroup label="▲ Income">
+                    {categories.filter(c=>c.type==="income").map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                  </optgroup>
+                  <optgroup label="▼ Expense">
+                    {categories.filter(c=>c.type==="expense").map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                  </optgroup>
+                </select>
               </div>
 
               {/* Status */}
