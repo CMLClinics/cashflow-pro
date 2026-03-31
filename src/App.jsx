@@ -726,7 +726,27 @@ function CashFlowPro({ session, onLogout, users, saveUsers }) {
     };
   },[unifiedLedger,openingBalance]);
 
-  // QB Sync — calls real API, falls back to mock if not connected
+  // Poll for transactions sent by Chrome extension scraper
+  useEffect(()=>{
+    const poll = async () => {
+      try {
+        const r = await fetch("/api/qb-scraped-poll");
+        const d = await r.json();
+        if (d.transactions && d.transactions.length > 0) {
+          const existingIds = new Set(actualTxns.map(t=>t.id).filter(Boolean));
+          const newTxns = d.transactions.filter(t => !existingIds.has(t.id));
+          if (newTxns.length > 0) {
+            setActualTxns(prev=>[...newTxns, ...prev]);
+            setSyncMsg(`⬇ ${newTxns.length} new transactions from Chrome extension`);
+          }
+        }
+      } catch(e) { /* silent fail */ }
+    };
+    const interval = setInterval(poll, 10000); // poll every 10s
+    return () => clearInterval(interval);
+  }, [actualTxns]);
+
+  // QB Sync
   const handleSync = async () => {
     setSyncing(true); setSyncMsg(null);
     try {
