@@ -1639,10 +1639,13 @@ function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore
               <div onClick={e=>e.stopPropagation()}>
                 {(!row.categoryId || row.categoryId==="") ? (
                   <select
-                    defaultValue=""
-                    onChange={e=>{ if(e.target.value && onCatAssign) onCatAssign(row.id, e.target.value); }}
-                    style={{fontSize:10,background:"#1A0A00",border:`1px solid ${COLORS.warning}66`,color:COLORS.warning,borderRadius:6,padding:"2px 6px",cursor:"pointer",maxWidth:95}}>
-                    <option value="" disabled>⚠ Assign…</option>
+                    value=""
+                    onChange={e=>{
+                      const catId = e.target.value;
+                      if(catId && onCatAssign) onCatAssign(row.id, catId);
+                    }}
+                    style={{fontSize:10,background:"#1A0A00",border:`1px solid ${COLORS.warning}88`,color:COLORS.warning,borderRadius:6,padding:"3px 7px",cursor:"pointer",maxWidth:100,fontWeight:700}}>
+                    <option value="" disabled>⚠ Set category</option>
                     <optgroup label="── Income ──">
                       {categories.filter(c=>c.type==="income").map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                     </optgroup>
@@ -1651,7 +1654,11 @@ function UnifiedLedgerTable({rows, entities, categories, accounts, title, onMore
                     </optgroup>
                   </select>
                 ) : (
-                  cat ? <Badge color={cat.color}>{cat.name}</Badge> : null
+                  cat
+                    ? <div style={{cursor:"pointer"}} title="Click to change category" onClick={()=>{ if(onCatAssign){ const next=window.prompt("Change category ID (or leave to cancel):",row.categoryId); if(next&&next!==row.categoryId) onCatAssign(row.id,next); }}}>
+                        <Badge color={cat.color}>{cat.name}</Badge>
+                      </div>
+                    : <Badge color={COLORS.textDim}>Unknown</Badge>
                 )}
               </div>
 

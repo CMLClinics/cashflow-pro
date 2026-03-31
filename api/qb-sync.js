@@ -1,22 +1,8 @@
-// api/qb-sync.js — Delta sync, only pulls transactions for linked accounts
+// api/qb-sync.js — Full transaction pull including all QB transaction types
 
 import { refreshTokenIfNeeded } from "./_qb-refresh.js";
 
 const QB_BASE = "https://quickbooks.api.intuit.com";
-
-function mapQBAccount(name) {
-  if (!name) return "cat12";
-  const n = name.toLowerCase();
-  if (n.includes("payroll")||n.includes("salary")||n.includes("wage")) return "cat5";
-  if (n.includes("rent")||n.includes("lease"))                          return "cat8";
-  if (n.includes("adverti")||n.includes("market"))                      return "cat6";
-  if (n.includes("software")||n.includes("subscri"))                    return "cat9";
-  if (n.includes("utility")||n.includes("hydro")||n.includes("gas"))    return "cat10";
-  if (n.includes("tax")||n.includes("hst")||n.includes("gst"))          return "cat11";
-  if (n.includes("revenue")||n.includes("income")||n.includes("sales")) return "cat1";
-  if (n.includes("membersh"))                                            return "cat2";
-  return "cat12";
-}
 
 async function fetchQBTransactions(tokenData, sinceDate, linkedQBAccountIds) {
   const token = await refreshTokenIfNeeded(tokenData);
@@ -24,60 +10,88 @@ async function fetchQBTransactions(tokenData, sinceDate, linkedQBAccountIds) {
   const headers = { "Authorization": `Bearer ${access_token}`, "Accept": "application/json" };
   const base = `${QB_BASE}/v3/company/${realmId}`;
 
-  const results = [];
-
-  // If we have linked account IDs, query per account for efficiency
-  // Otherwise skip — don't pull unlinked accounts
   if (!linkedQBAccountIds || linkedQBAccountIds.length === 0) {
-    console.log(`Entity ${entityId}: no linked QB accounts — skipping sync`);
+    console.log(`Entity ${entityId}: no linked QB accounts — skipping`);
     return [];
   }
 
-  // Build account filter for QB query
-  // QB uses account Id in WHERE clause
-  const acctFilter = linkedQBAccountIds.map(id => `AccountRef = '${id}'`).join(" OR ");
+  const results = [];
 
-  const queries = [
-    { q: `SELECT * FROM Purchase WHERE TxnDate >= '${sinceDate}' AND (${acctFilter}) MAXRESULTS 1000`, type: "Purchase" },
-    { q: `SELECT * FROM Deposit  WHERE TxnDate >= '${sinceDate}' MAXRESULTS 1000`, type: "Deposit" },
-    { q: `SELECT * FROM Invoice  WHERE TxnDate >= '${sinceDate}' MAXRESULTS 1000`, type: "Invoice" },
-    { q: `SELECT * FROM Bill     WHERE TxnDate >= '${sinceDate}' AND (${acctFilter}) MAXRESULTS 1000`, type: "Bill" },
-  ];
-
-  for (const { q, type } of queries) {
+  // Helper: run a QB query
+  const query = async (sql) => {
     try {
-      const url = `${base}/query?query=${encodeURIComponent(q)}&minorversion=65`;
+      const url = `${base}/query?query=${encodeURIComponent(sql)}&minorversion=65`;
       const r = await fetch(url, { headers });
-      if (!r.ok) { console.error(`QB ${type} failed:`, r.status); continue; }
-      const data = await r.json();
-      const qr = data?.QueryResponse || {};
+      if (!r.ok) { console.error("QB query failed:", r.status, sql.slice(0,60)); return {}; }
+      const d = await r.json();
+      return d?.QueryResponse || {};
+    } catch(e) { console.error("QB query error:", e.message); return {}; }
+  };
 
-      (qr.Purchase||[]).forEach(p => {
-        const qbAccountId = p.AccountRef?.value;
-        if (!linkedQBAccountIds.includes(qbAccountId)) return; // skip unlinked
-        results.push({ qbId:`P-${p.Id}`, qbType:"Purchase", qbAccountId, date:p.TxnDate, description:p.PrivateNote||p.PaymentType||p.EntityRef?.name||"QB Purchase", amount:Math.abs(parseFloat(p.TotalAmt||0)), type:"expense", categoryId:"", entityId, realmId, source:"quickbooks" });
+  // 1. Purchases (bank/card withdrawals)
+  const purchases = await query(`SELECT * FROM Purchase WHERE TxnDate >= '${sinceDate}' MAXRESULTS 1000`);
+  (purchases.Purchase||[]).forEach(p => {
+    const qbAccountId = p.AccountRef?.value;
+    if (!linkedQBAccountIds.includes(qbAccountId)) return;
+    results.push({ qbId:`P-${p.Id}`, qbType:"Purchase", qbAccountId,
+      date:p.TxnDate, description:p.EntityRef?.name||p.PrivateNote||p.PaymentType||"Purchase",
+      amount:Math.abs(parseFloat(p.TotalAmt||0)), type:"expense", categoryId:"", entityId, realmId, source:"quickbooks" });
+  });
 
-      });
+  // 2. Deposits
+  const deposits = await query(`SELECT * FROM Deposit WHERE TxnDate >= '${sinceDate}' MAXRESULTS 1000`);
+  (deposits.Deposit||[]).forEach(d => {
+    const qbAccountId = d.DepositToAccountRef?.value;
+    if (!linkedQBAccountIds.includes(qbAccountId)) return;
+    const memo = d.PrivateNote || (d.Line?.[0]?.Description) || "Deposit";
+    results.push({ qbId:`D-${d.Id}`, qbType:"Deposit", qbAccountId,
+      date:d.TxnDate, description:memo,
+      amount:Math.abs(parseFloat(d.TotalAmt||0)), type:"income", categoryId:"", entityId, realmId, source:"quickbooks" });
+  });
 
-      (qr.Deposit||[]).forEach(d => {
-        const qbAccountId = d.DepositToAccountRef?.value;
-        if (!linkedQBAccountIds.includes(qbAccountId)) return;
-        results.push({ qbId:`D-${d.Id}`, qbType:"Deposit", qbAccountId, date:d.TxnDate, description:d.PrivateNote||"QB Deposit", amount:Math.abs(parseFloat(d.TotalAmt||0)), type:"income", categoryId:"", entityId, realmId, source:"quickbooks" });
-      });
+  // 3. Customer payments received (cash hitting bank)
+  const payments = await query(`SELECT * FROM Payment WHERE TxnDate >= '${sinceDate}' MAXRESULTS 1000`);
+  (payments.Payment||[]).forEach(p => {
+    const qbAccountId = p.DepositToAccountRef?.value;
+    if (qbAccountId && !linkedQBAccountIds.includes(qbAccountId)) return;
+    results.push({ qbId:`PMT-${p.Id}`, qbType:"Payment", qbAccountId:qbAccountId||linkedQBAccountIds[0],
+      date:p.TxnDate, description:`Payment — ${p.CustomerRef?.name||""}`,
+      amount:Math.abs(parseFloat(p.TotalAmt||0)), type:"income", categoryId:"", entityId, realmId, source:"quickbooks" });
+  });
 
-      (qr.Invoice||[]).filter(i=>i.Balance===0).forEach(i => {
-        // Invoices go to first linked account for that entity
-        results.push({ qbId:`I-${i.Id}`, qbType:"Invoice", qbAccountId:linkedQBAccountIds[0], date:i.TxnDate, description:`Invoice #${i.DocNumber||i.Id} — ${i.CustomerRef?.name||""}`, amount:Math.abs(parseFloat(i.TotalAmt||0)), type:"income", categoryId:"", entityId, realmId, source:"quickbooks" });
+  // 4. Journal Entries (filtered to linked accounts only)
+  const journals = await query(`SELECT * FROM JournalEntry WHERE TxnDate >= '${sinceDate}' MAXRESULTS 1000`);
+  (journals.JournalEntry||[]).forEach(j => {
+    (j.Line||[]).forEach(line => {
+      const detail = line.JournalEntryLineDetail;
+      if (!detail) return;
+      const qbAccountId = detail.AccountRef?.value;
+      if (!linkedQBAccountIds.includes(qbAccountId)) return;
+      const isDebit = detail.PostingType === "Debit";
+      results.push({ qbId:`JE-${j.Id}-${line.Id||"0"}`, qbType:"JournalEntry", qbAccountId,
+        date:j.TxnDate, description:line.Description||`Journal Entry #${j.DocNumber||j.Id}`,
+        amount:Math.abs(parseFloat(line.Amount||0)), type:isDebit?"expense":"income", categoryId:"", entityId, realmId, source:"quickbooks" });
+    });
+  });
 
-      });
+  // 5. Transfers between bank accounts
+  const transfers = await query(`SELECT * FROM Transfer WHERE TxnDate >= '${sinceDate}' MAXRESULTS 1000`);
+  (transfers.Transfer||[]).forEach(t => {
+    const fromId = t.FromAccountRef?.value;
+    const toId   = t.ToAccountRef?.value;
+    if (linkedQBAccountIds.includes(fromId)) {
+      results.push({ qbId:`TRF-OUT-${t.Id}`, qbType:"Transfer", qbAccountId:fromId,
+        date:t.TxnDate, description:`Transfer to ${t.ToAccountRef?.name||""}`,
+        amount:Math.abs(parseFloat(t.Amount||0)), type:"expense", categoryId:"", entityId, realmId, source:"quickbooks" });
+    }
+    if (linkedQBAccountIds.includes(toId)) {
+      results.push({ qbId:`TRF-IN-${t.Id}`, qbType:"Transfer", qbAccountId:toId,
+        date:t.TxnDate, description:`Transfer from ${t.FromAccountRef?.name||""}`,
+        amount:Math.abs(parseFloat(t.Amount||0)), type:"income", categoryId:"", entityId, realmId, source:"quickbooks" });
+    }
+  });
 
-      (qr.Bill||[]).forEach(b => {
-        const qbAccountId = b.APAccountRef?.value;
-        if (!linkedQBAccountIds.includes(qbAccountId)) return;
-        results.push({ qbId:`B-${b.Id}`, qbType:"Bill", qbAccountId, date:b.TxnDate, description:`Bill — ${b.VendorRef?.name||""}`, amount:Math.abs(parseFloat(b.TotalAmt||0)), type:"expense", categoryId:"", entityId, realmId, source:"quickbooks" });
-      });
-    } catch(e) { console.error(`QB ${type} error:`, e.message); }
-  }
+  console.log(`Entity ${entityId}: fetched ${results.length} transactions since ${sinceDate}`);
   return results;
 }
 
@@ -98,7 +112,7 @@ export default async function handler(req, res) {
     const keys = await kv.keys("qb_token_*");
     if (!keys.length) return res.status(200).json({ transactions:[], message:"No QB companies connected." });
 
-    // Build a map: entityId → [qbAccountId, ...] from the linked accounts
+    // Build entityId → linked QB account IDs map
     const entityToQBAccounts = {};
     (accounts||[]).forEach(a => {
       if (a.qbAccountId) {
@@ -110,8 +124,7 @@ export default async function handler(req, res) {
     const allResults = await Promise.allSettled(keys.map(async key => {
       const raw = await kv.get(key);
       const td = typeof raw === "string" ? JSON.parse(raw) : raw;
-      const linkedIds = entityToQBAccounts[td.entity_id] || [];
-      return fetchQBTransactions(td, since, linkedIds);
+      return fetchQBTransactions(td, since, entityToQBAccounts[td.entity_id]||[]);
     }));
 
     let transactions = [];
@@ -121,14 +134,14 @@ export default async function handler(req, res) {
       else errors.push({ key:keys[i], error:r.reason?.message });
     });
 
-    // Map each transaction to its CashFlow Pro account
+    // Map to CashFlow Pro account
     transactions = transactions.map(txn => {
-      const matchedAcct = (accounts||[]).find(a => a.qbAccountId === txn.qbAccountId && a.entityId === txn.entityId);
+      const matchedAcct = (accounts||[]).find(a => a.qbAccountId===txn.qbAccountId && a.entityId===txn.entityId);
       return { ...txn, accountId: matchedAcct?.id || null };
     });
 
     await kv.set("qb_last_sync", new Date().toISOString());
-    return res.status(200).json({ transactions, errors, syncedAt: new Date().toISOString(), totalCount: transactions.length, since });
+    return res.status(200).json({ transactions, errors, syncedAt:new Date().toISOString(), totalCount:transactions.length, since });
   } catch(err) {
     return res.status(500).json({ error:"Sync failed", message:err.message });
   }
